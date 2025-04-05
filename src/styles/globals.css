@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-rgb: 17, 24, 39;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  min-height: 100vh;
+}
+
+@layer components {
+  .input-field {
+    @apply w-full px-4 py-3 rounded-md bg-dark-input text-white 
+    border border-gray-700 focus:border-primary focus:outline-none 
+    focus:ring-1 focus:ring-primary transition-all duration-200;
+  }
+  
+  .btn {
+    @apply px-6 py-3 rounded-md font-medium transition-all duration-200;
+  }
+  
+  .btn-primary {
+    @apply btn bg-primary text-white hover:bg-primary-dark;
+  }
+  
+  .btn-secondary {
+    @apply btn bg-gray-700 text-white hover:bg-gray-600;
+  }
+  
+  .sidebar-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-md transition-all 
+    hover:bg-dark-light cursor-pointer font-medium;
+  }
+  
+  .sidebar-item.active {
+    @apply bg-dark-light;
+  }
+}
