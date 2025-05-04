@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "generate-sources": "dotenv -- tsx ./src/scripts/generate-sources.ts",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -22,6 +23,9 @@
     "zod": "^3.21.4"
   },
   "devDependencies": {
+    "dotenv-cli": "^8.0.0",
+    "tsx": "^4.19.3",
+    "swagger-typescript-api": "^13.1.1",
     "@types/node": "22.13.17",
     "@types/react": "19.0.12",
     "autoprefixer": "^10.4.21",
@@ -31,3 +35,4 @@
     "tailwindcss": "^3.4.17"
   }
 }
+
