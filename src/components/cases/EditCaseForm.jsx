@@ -1,123 +1,153 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'react-toastify';
 import { FiSave, FiX } from 'react-icons/fi';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateCase } from '@/lib/api';
+import { useLawsuits } from '@/hooks/useLawsuits';
+import { useParticipants } from '@/hooks/useParticipants';
+import { useProceedingTypes } from '@/hooks/useProceedingTypes';
 
 // Esquema de validación para el formulario de edición de caso
 const editCaseSchema = z.object({
-  procedureType: z.string().min(1, 'Seleccione un tipo de procedimiento'),
-  legalMatter: z.string().min(1, 'Seleccione una materia legal'),
-  status: z.string().min(1, 'Seleccione un estado'),
-  
-  // Información del demandante
-  plaintiffName: z.string().min(3, 'Nombre completo requerido'),
-  plaintiffId: z.string().min(3, 'RUT requerido'),
-  plaintiffAddress: z.string().min(5, 'Dirección requerida'),
-  
-  // Información del demandado
-  defendantName: z.string().min(3, 'Nombre completo requerido'),
-  defendantId: z.string().min(3, 'RUT requerido'),
-  defendantAddress: z.string().min(5, 'Dirección requerida'),
-  
-  // Descripción del caso
-  description: z.string().min(20, 'La descripción debe tener al menos 20 caracteres')
+  proceedingType: z.string().min(1, 'Seleccione un tipo de procedimiento'),
+  subjectMatter: z.string().min(1, 'Ingrese una materia legal'),
+  plaintiffs: z.array(z.string()).min(1, 'Debe seleccionar al menos un demandante'),
+  attorneyOfRecord: z.string().min(1, 'Seleccione un abogado patrocinante'),
+  defendants: z.array(z.string()).min(1, 'Debe seleccionar al menos un demandado'),
+  representative: z.string().optional(),
+  claims: z.array(z.string()).min(1, 'Ingrese al menos una petición'),
+  institution: z.string().min(1, 'Ingrese el tribunal'),
+  narrative: z.string().min(20, 'La descripción debe tener al menos 20 caracteres')
 });
 
 const EditCaseForm = ({ caseData, onCancel }) => {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [claimInput, setClaimInput] = useState('');
+  const [claimsList, setClaimsList] = useState([]);
   const queryClient = useQueryClient();
   
-  const { register, handleSubmit, formState: { errors }, reset } = useForm({
+  // Hooks para acceder a la API
+  const { updateLawsuit } = useLawsuits();
+  const {
+    plaintiffs,
+    lawyers,
+    defendants,
+    representatives,
+    isLoadingPlaintiffs,
+    isLoadingLawyers,
+    isLoadingDefendants,
+    isLoadingRepresentatives
+  } = useParticipants();
+  const { proceedingTypes, isLoadingProceedingTypes } = useProceedingTypes();
+  
+  // Preparar valores iniciales para el formulario
+  const getInitialValues = () => {
+    return {
+      proceedingType: caseData.proceedingType?.name || '',
+      subjectMatter: caseData.subjectMatter || '',
+      plaintiffs: caseData.plaintiffs?.map(p => p.idNumber) || [],
+      attorneyOfRecord: caseData.attorneyOfRecord?.idNumber || '',
+      defendants: caseData.defendants?.map(d => d.idNumber) || [],
+      representative: caseData.representative?.idNumber || '',
+      claims: caseData.claims || [],
+      institution: caseData.institution || '',
+      narrative: caseData.narrative || ''
+    };
+  };
+  
+  // Configuración del formulario con React Hook Form
+  const { 
+    register, 
+    handleSubmit, 
+    control,
+    setValue,
+    formState: { errors },
+    reset
+  } = useForm({
     resolver: zodResolver(editCaseSchema),
-    defaultValues: {
-      procedureType: caseData.procedureType || '',
-      legalMatter: caseData.legalMatter || '',
-      status: caseData.status || 'En curso',
-      plaintiffName: caseData.plaintiffName || '',
-      plaintiffId: caseData.plaintiffId || '',
-      plaintiffAddress: caseData.plaintiffAddress || '',
-      defendantName: caseData.defendantName || '',
-      defendantId: caseData.defendantId || '',
-      defendantAddress: caseData.defendantAddress || '',
-      description: caseData.description || ''
-    }
+    defaultValues: getInitialValues()
   });
 
-  // Cargar datos iniciales cuando cambia caseData
+  // Inicializar la lista de claims con los valores existentes
   useEffect(() => {
-    if (caseData) {
-      reset({
-        procedureType: caseData.procedureType || '',
-        legalMatter: caseData.legalMatter || '',
-        status: caseData.status || 'En curso',
-        plaintiffName: caseData.plaintiffName || '',
-        plaintiffId: caseData.plaintiffId || '',
-        plaintiffAddress: caseData.plaintiffAddress || '',
-        defendantName: caseData.defendantName || '',
-        defendantId: caseData.defendantId || '',
-        defendantAddress: caseData.defendantAddress || '',
-        description: caseData.description || ''
-      });
+    if (caseData.claims && caseData.claims.length > 0) {
+      setClaimsList(caseData.claims);
     }
+  }, [caseData]);
+
+  // Actualizar claims en el formulario cuando cambia la lista
+  useEffect(() => {
+    setValue('claims', claimsList);
+  }, [claimsList, setValue]);
+
+  // Resetear el formulario cuando cambia caseData
+  useEffect(() => {
+    reset(getInitialValues());
   }, [caseData, reset]);
 
-  // Mutación para actualizar caso
-  const updateCaseMutation = useMutation({
-    mutationFn: (data) => updateCase(caseData.id, data),
-    onSuccess: () => {
-      // Invalidar consultas para refrescar datos
-      queryClient.invalidateQueries(['cases']);
-      queryClient.invalidateQueries(['case', caseData.id]);
-      
-      toast.success('Caso actualizado exitosamente');
-      
-      // Cerrar el formulario de edición
-      onCancel();
-    },
-    onError: (error) => {
-      toast.error(`Error al actualizar el caso: ${error.message}`);
-      setSaving(false);
+  // Función para añadir petición
+  const handleAddClaim = () => {
+    if (claimInput.trim()) {
+      setClaimsList(prev => [...prev, claimInput.trim()]);
+      setClaimInput('');
     }
-  });
+  };
 
-  // Opciones para los selectores
-  const procedureTypes = [
-    { value: 'Juicio ordinario', label: 'Juicio ordinario' },
-    { value: 'Juicio ejecutivo', label: 'Juicio ejecutivo' },
-    { value: 'Procedimiento sumario', label: 'Procedimiento sumario' },
-    { value: 'Medida precautoria', label: 'Medida precautoria' }
-  ];
-
-  const legalMatters = [
-    { value: 'Cobro de deuda', label: 'Cobro de deuda' },
-    { value: 'Incumplimiento de contrato', label: 'Incumplimiento de contrato' },
-    { value: 'Arrendamiento', label: 'Arrendamiento' },
-    { value: 'Responsabilidad civil', label: 'Responsabilidad civil' },
-    { value: 'Derecho del consumidor', label: 'Derecho del consumidor' }
-  ];
-
-  const statusOptions = [
-    { value: 'En curso', label: 'En curso' },
-    { value: 'Pendiente', label: 'Pendiente' },
-    { value: 'Finalizado', label: 'Finalizado' }
-  ];
+  // Función para eliminar petición
+  const handleRemoveClaim = (index) => {
+    setClaimsList(prev => prev.filter((_, i) => i !== index));
+  };
 
   // Manejar el envío del formulario
   const onSubmit = async (data) => {
     setSaving(true);
     try {
-      await updateCaseMutation.mutateAsync(data);
+      // Transformar datos al formato esperado por la API
+      const lawsuitRequest = {
+        proceedingType: data.proceedingType,
+        subjectMatter: data.subjectMatter,
+        plaintiffs: data.plaintiffs,
+        attorneyOfRecord: data.attorneyOfRecord,
+        defendants: data.defendants,
+        representative: data.representative || undefined,
+        claims: data.claims,
+        institution: data.institution,
+        narrative: data.narrative
+      };
+      
+      // Actualizar la demanda
+      await updateLawsuit(caseData.id, lawsuitRequest);
+      
+      // Invalidar consultas para refrescar datos
+      queryClient.invalidateQueries(['lawsuits']);
+      queryClient.invalidateQueries(['lawsuit', caseData.id]);
+      
+      toast.success('Caso actualizado exitosamente');
+      onCancel(); // Cerrar formulario de edición
     } catch (error) {
-      // Error manejado por la mutación
+      console.error('Error al actualizar caso:', error);
+      toast.error('Error al actualizar el caso');
       setSaving(false);
     }
   };
+
+  // Mostrar indicador de carga mientras se obtienen los datos
+  const isLoading = isLoadingProceedingTypes || isLoadingPlaintiffs || 
+                    isLoadingLawyers || isLoadingDefendants || 
+                    isLoadingRepresentatives;
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mx-auto mb-3"></div>
+        <p className="text-gray-400">Cargando datos...</p>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -132,152 +162,207 @@ const EditCaseForm = ({ caseData, onCancel }) => {
         </button>
       </div>
       
-      {/* Tipo de procedimiento, materia legal y estado */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Tipo de procedimiento y materia legal */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block mb-1 text-gray-300">Tipo de procedimiento</label>
           <select 
-            {...register('procedureType')}
-            className={`input-field ${errors.procedureType ? 'border-red-500' : ''}`}
+            {...register('proceedingType')}
+            className={`input-field ${errors.proceedingType ? 'border-red-500' : ''}`}
           >
             <option value="">Seleccione una opción</option>
-            {procedureTypes.map(type => (
-              <option key={type.value} value={type.value}>
-                {type.label}
+            {proceedingTypes?.map(type => (
+              <option key={type.name} value={type.name}>
+                {type.description}
               </option>
             ))}
           </select>
-          {errors.procedureType && (
-            <p className="mt-1 text-sm text-red-500">{errors.procedureType.message}</p>
+          {errors.proceedingType && (
+            <p className="mt-1 text-sm text-red-500">{errors.proceedingType.message}</p>
           )}
         </div>
         
         <div>
           <label className="block mb-1 text-gray-300">Materia legal</label>
-          <select 
-            {...register('legalMatter')}
-            className={`input-field ${errors.legalMatter ? 'border-red-500' : ''}`}
-          >
-            <option value="">Seleccione una opción</option>
-            {legalMatters.map(matter => (
-              <option key={matter.value} value={matter.value}>
-                {matter.label}
-              </option>
-            ))}
-          </select>
-          {errors.legalMatter && (
-            <p className="mt-1 text-sm text-red-500">{errors.legalMatter.message}</p>
-          )}
-        </div>
-
-        <div>
-          <label className="block mb-1 text-gray-300">Estado del caso</label>
-          <select 
-            {...register('status')}
-            className={`input-field ${errors.status ? 'border-red-500' : ''}`}
-          >
-            {statusOptions.map(status => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
-          {errors.status && (
-            <p className="mt-1 text-sm text-red-500">{errors.status.message}</p>
-          )}
-        </div>
-      </div>
-      
-      {/* Información del demandante */}
-      <div>
-        <h3 className="text-md font-semibold mb-3 text-gray-200">Información del demandante</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block mb-1 text-gray-300">Nombre Completo</label>
-            <input 
-              type="text" 
-              {...register('plaintiffName')}
-              className={`input-field ${errors.plaintiffName ? 'border-red-500' : ''}`}
-            />
-            {errors.plaintiffName && (
-              <p className="mt-1 text-sm text-red-500">{errors.plaintiffName.message}</p>
-            )}
-          </div>
-          <div>
-            <label className="block mb-1 text-gray-300">RUT</label>
-            <input 
-              type="text" 
-              {...register('plaintiffId')}
-              className={`input-field ${errors.plaintiffId ? 'border-red-500' : ''}`}
-            />
-            {errors.plaintiffId && (
-              <p className="mt-1 text-sm text-red-500">{errors.plaintiffId.message}</p>
-            )}
-          </div>
-        </div>
-        <div>
-          <label className="block mb-1 text-gray-300">Dirección</label>
           <input 
             type="text" 
-            {...register('plaintiffAddress')}
-            className={`input-field ${errors.plaintiffAddress ? 'border-red-500' : ''}`}
+            {...register('subjectMatter')}
+            placeholder="Ej: Prescripción extintiva"
+            className={`input-field ${errors.subjectMatter ? 'border-red-500' : ''}`}
           />
-          {errors.plaintiffAddress && (
-            <p className="mt-1 text-sm text-red-500">{errors.plaintiffAddress.message}</p>
+          {errors.subjectMatter && (
+            <p className="mt-1 text-sm text-red-500">{errors.subjectMatter.message}</p>
           )}
         </div>
       </div>
       
-      {/* Información del demandado */}
+      {/* Selección de demandantes */}
       <div>
-        <h3 className="text-md font-semibold mb-3 text-gray-200">Información demandad@</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label className="block mb-1 text-gray-300">Nombre Completo</label>
-            <input 
-              type="text" 
-              {...register('defendantName')}
-              className={`input-field ${errors.defendantName ? 'border-red-500' : ''}`}
-            />
-            {errors.defendantName && (
-              <p className="mt-1 text-sm text-red-500">{errors.defendantName.message}</p>
-            )}
-          </div>
-          <div>
-            <label className="block mb-1 text-gray-300">RUT</label>
-            <input 
-              type="text" 
-              {...register('defendantId')}
-              className={`input-field ${errors.defendantId ? 'border-red-500' : ''}`}
-            />
-            {errors.defendantId && (
-              <p className="mt-1 text-sm text-red-500">{errors.defendantId.message}</p>
-            )}
-          </div>
-        </div>
-        <div>
-          <label className="block mb-1 text-gray-300">Dirección</label>
-          <input 
-            type="text" 
-            {...register('defendantAddress')}
-            className={`input-field ${errors.defendantAddress ? 'border-red-500' : ''}`}
-          />
-          {errors.defendantAddress && (
-            <p className="mt-1 text-sm text-red-500">{errors.defendantAddress.message}</p>
+        <label className="block mb-1 text-gray-300">Demandantes</label>
+        <Controller
+          name="plaintiffs"
+          control={control}
+          render={({ field }) => (
+            <select
+              multiple
+              value={field.value}
+              onChange={(e) => {
+                const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+                field.onChange(selectedOptions);
+              }}
+              className={`input-field h-32 ${errors.plaintiffs ? 'border-red-500' : ''}`}
+            >
+              {plaintiffs?.map(plaintiff => (
+                <option key={plaintiff.idNumber} value={plaintiff.idNumber}>
+                  {plaintiff.fullName} ({plaintiff.idNumber})
+                </option>
+              ))}
+            </select>
           )}
-        </div>
-      </div>
-      
-      {/* Descripción del caso */}
-      <div>
-        <label className="block mb-1 text-gray-300">Descripción del caso</label>
-        <textarea 
-          {...register('description')}
-          rows={5}
-          className={`input-field ${errors.description ? 'border-red-500' : ''}`}
         />
-        {errors.description && (
-          <p className="mt-1 text-sm text-red-500">{errors.description.message}</p>
+        {errors.plaintiffs && (
+          <p className="mt-1 text-sm text-red-500">{errors.plaintiffs.message}</p>
+        )}
+      </div>
+      
+      {/* Abogado patrocinante */}
+      <div>
+        <label className="block mb-1 text-gray-300">Abogado patrocinante</label>
+        <select 
+          {...register('attorneyOfRecord')}
+          className={`input-field ${errors.attorneyOfRecord ? 'border-red-500' : ''}`}
+        >
+          <option value="">Seleccione un abogado</option>
+          {lawyers?.map(lawyer => (
+            <option key={lawyer.idNumber} value={lawyer.idNumber}>
+              {lawyer.fullName} ({lawyer.idNumber})
+            </option>
+          ))}
+        </select>
+        {errors.attorneyOfRecord && (
+          <p className="mt-1 text-sm text-red-500">{errors.attorneyOfRecord.message}</p>
+        )}
+      </div>
+      
+      {/* Selección de demandados */}
+      <div>
+        <label className="block mb-1 text-gray-300">Demandados</label>
+        <Controller
+          name="defendants"
+          control={control}
+          render={({ field }) => (
+            <select
+              multiple
+              value={field.value}
+              onChange={(e) => {
+                const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+                field.onChange(selectedOptions);
+              }}
+              className={`input-field h-32 ${errors.defendants ? 'border-red-500' : ''}`}
+            >
+              {defendants?.map(defendant => (
+                <option key={defendant.idNumber} value={defendant.idNumber}>
+                  {defendant.fullName} ({defendant.idNumber})
+                </option>
+              ))}
+            </select>
+          )}
+        />
+        {errors.defendants && (
+          <p className="mt-1 text-sm text-red-500">{errors.defendants.message}</p>
+        )}
+      </div>
+      
+      {/* Representante legal (opcional) */}
+      <div>
+        <label className="block mb-1 text-gray-300">Representante legal (opcional)</label>
+        <select 
+          {...register('representative')}
+          className={`input-field ${errors.representative ? 'border-red-500' : ''}`}
+        >
+          <option value="">Seleccione un representante</option>
+          {representatives?.map(representative => (
+            <option key={representative.idNumber} value={representative.idNumber}>
+              {representative.fullName} ({representative.idNumber})
+            </option>
+          ))}
+        </select>
+        {errors.representative && (
+          <p className="mt-1 text-sm text-red-500">{errors.representative.message}</p>
+        )}
+      </div>
+      
+      {/* Peticiones */}
+      <div>
+        <label className="block mb-1 text-gray-300">Peticiones al tribunal</label>
+        <div className="flex mb-2">
+          <input
+            type="text"
+            value={claimInput}
+            onChange={(e) => setClaimInput(e.target.value)}
+            placeholder="Agregue una petición"
+            className="input-field flex-1"
+          />
+          <button
+            type="button"
+            onClick={handleAddClaim}
+            className="ml-2 btn-secondary"
+          >
+            Agregar
+          </button>
+        </div>
+        
+        {/* Lista de peticiones */}
+        <div className={`bg-dark p-3 rounded-md ${errors.claims ? 'border border-red-500' : 'border border-gray-700'}`}>
+          {claimsList.length > 0 ? (
+            <ul className="space-y-2">
+              {claimsList.map((claim, index) => (
+                <li key={index} className="flex justify-between items-center p-2 bg-dark-light rounded">
+                  <span className="text-gray-300">{claim}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveClaim(index)}
+                    className="text-red-500 hover:text-red-400"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-gray-500 text-sm p-2">No hay peticiones añadidas</p>
+          )}
+        </div>
+        {errors.claims && (
+          <p className="mt-1 text-sm text-red-500">{errors.claims.message}</p>
+        )}
+      </div>
+      
+      {/* Tribunal */}
+      <div>
+        <label className="block mb-1 text-gray-300">Tribunal</label>
+        <input 
+          type="text" 
+          {...register('institution')}
+          placeholder="Ej: S.J.L. EN LO CIVIL"
+          className={`input-field ${errors.institution ? 'border-red-500' : ''}`}
+        />
+        {errors.institution && (
+          <p className="mt-1 text-sm text-red-500">{errors.institution.message}</p>
+        )}
+      </div>
+      
+      {/* Descripción / Relato */}
+      <div>
+        <label className="block mb-1 text-gray-300">Descripción del caso (relato)</label>
+        <textarea 
+          {...register('narrative')}
+          placeholder="Ingrese el relato detallado del caso"
+          rows={8}
+          className={`input-field ${errors.narrative ? 'border-red-500' : ''}`}
+        />
+        {errors.narrative && (
+          <p className="mt-1 text-sm text-red-500">{errors.narrative.message}</p>
         )}
       </div>
       

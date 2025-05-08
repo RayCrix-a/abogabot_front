@@ -1,11 +1,17 @@
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { useEffect } from 'react';
 import { FiHome, FiFolder, FiClock, FiSettings } from 'react-icons/fi';
 import { useCases } from '@/hooks/useCases';
 
-const Sidebar = ({ isOpen }) => {
+const Sidebar = ({ isOpen, onToggle }) => {
   const router = useRouter();
   const { cases } = useCases();
+
+  // Efecto para sincronizar el estado del sidebar con localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', isOpen);
+  }, [isOpen]);
 
   // Filtrar casos recientes (no finalizados)
   const recentCases = cases?.filter(c => c.status !== 'Finalizado').slice(0, 5) || [];

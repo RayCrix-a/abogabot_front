@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCases, getCaseById, createCase, deleteCase, updateCase, updateCaseStatus } from '@/lib/api';
+import { lawsuitResource, getCases, getCaseById, deleteCase, updateCase, updateCaseStatus } from '@/lib/apiClient';
 import { toast } from 'react-toastify';
 
 /**
@@ -22,12 +22,29 @@ export const useCases = () => {
 
   // Mutación para crear un nuevo caso
   const createCaseMutation = useMutation({
-    mutationFn: createCase,
+    mutationFn: async (data) => {
+      const lawsuitRequest = {
+        proceedingType: data.proceedingType,
+        subjectMatter: data.legalMatter,
+        plaintiffs: [data.plaintiffId],
+        defendants: [data.defendantId],
+        attorneyOfRecord: data.attorneyId || undefined,
+        representative: data.representativeId || undefined,
+        claims: data.claims || [],
+        institution: data.institution,
+        narrative: data.description
+      };
+
+      console.log('Enviando datos a la API:', lawsuitRequest);
+      const response = await lawsuitResource.createLawsuit(lawsuitRequest);
+      return response.data;
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries(['lawsuits']);
       toast.success('Caso creado exitosamente');
     },
     onError: (error) => {
+      console.error('Error al crear caso:', error);
       toast.error(`Error al crear el caso: ${error.message}`);
     }
   });
@@ -89,7 +106,7 @@ export const useCases = () => {
     casesError,
     refetchCases,
     useCase,
-    createCase: createCaseMutation.mutate,
+    createCase: createCaseMutation.mutateAsync,
     isCreatingCase: createCaseMutation.isLoading,
     updateCase: (id, data) => updateCaseMutation.mutate({ id, data }),
     isUpdatingCase: updateCaseMutation.isLoading,

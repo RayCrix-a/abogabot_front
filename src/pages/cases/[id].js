@@ -1,12 +1,11 @@
 import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import MainLayout from '@/components/layout/MainLayout';
 import CaseDetails from '@/components/cases/CaseDetails';
 import DocumentViewer from '@/components/document/DocumentViewer';
 import ChatBox from '@/components/chat/ChatBox';
-import { useCases } from '@/hooks/useCases';
-import { useDocuments } from '@/hooks/useDocuments';
+import { useLawsuits } from '@/hooks/useLawsuits';
 import { FiArrowLeft, FiFile, FiMessageCircle } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 
@@ -14,50 +13,93 @@ export default function CaseDetail() {
   const router = useRouter();
   const { id } = router.query;
   const [activeTab, setActiveTab] = useState('document'); // 'document' o 'chat'
+  const [markdownContent, setMarkdownContent] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
   
-  // Obtener datos del caso y funciones para manipularlo
-  const { useCase, deleteCase, updateCase, updateCaseStatus } = useCases();
-  const { data: caseData, isLoading: isLoadingCase, error: caseError } = useCase(id);
+  // Obtener datos del caso usando los nuevos hooks
+  const { 
+    useLawsuit, 
+    deleteLawsuit, 
+    updateLawsuit,
+    useLawsuitLastRevisions,
+    generate,
+    loading: isLoadingGeneration
+  } = useLawsuits();
   
-  // Obtener documento asociado
-  const { useDocument } = useDocuments();
-  const documentId = caseData?.documentId || `doc-${id?.replace('case-', '')}`; // Simulación de relación
-  const { data: documentData, isLoading: isLoadingDocument } = useDocument(documentId);
+  const { data: lawsuit, isLoading: isLoadingLawsuit, error: lawsuitError } = useLawsuit(id);
+
+  const { data: revision, isLoading: isLoadingRevision, error: revisiontError } = useLawsuitLastRevisions(id);
+
+  useEffect(() => {
+    // Si el documento tiene contenido, establecerlo
+    if (revision) {
+      setMarkdownContent(revision);
+    }
+  }, [revision]);
 
   // Manejar eliminación de caso
   const handleDeleteCase = async () => {
     try {
-      await deleteCase(id);
+      await deleteLawsuit(id);
       router.push('/dashboard');
     } catch (error) {
-      toast.error(`Error al eliminar el caso: ${error.message}`);
+      console.error('Error al eliminar caso:', error);
+      toast.error(`Error al eliminar el caso: ${error.message || 'Error desconocido'}`);
     }
   };
 
   // Manejar cambio de estado del caso
   const handleStatusChange = async (newStatus) => {
     try {
-      await updateCaseStatus(id, newStatus);
-      // Si el caso pasa a finalizado y estamos en la página de casos, redirigir al historial
-      if (newStatus === 'Finalizado' && router.pathname.includes('/cases/')) {
+      if (!lawsuit) return;
+      
+      // En una implementación real, enviaríamos el estado al servidor
+      // Por ahora solo mostramos una notificación
+      toast.info(`Estado cambiado a: ${newStatus}`);
+      
+      if (newStatus === 'Finalizado') {
         toast.info('El caso ha sido finalizado y movido al historial');
       }
     } catch (error) {
-      toast.error(`Error al cambiar el estado: ${error.message}`);
+      console.error('Error al cambiar el estado:', error);
+      toast.error(`Error al cambiar el estado: ${error.message || 'Error desconocido'}`);
     }
   };
 
   // Manejar edición del caso
   const handleEditCase = async (updatedData) => {
     try {
-      await updateCase(id, updatedData);
+      await updateLawsuit(id, updatedData);
     } catch (error) {
-      toast.error(`Error al actualizar el caso: ${error.message}`);
+      console.error('Error al actualizar el caso:', error);
+      toast.error(`Error al actualizar el caso: ${error.message || 'Error desconocido'}`);
+    }
+  };
+
+  // Generar documento
+  const handleGenerateDocument = async () => {
+    if (!id) return;
+    
+    // Limpiar el contenido antes de generar
+    setMarkdownContent('');
+    setIsGenerating(true);
+    
+    try {
+      await generate(id, (chunk) => {
+        // Actualizar el contenido del documento con cada chunk recibido
+        setMarkdownContent(prev => prev + chunk);
+      });
+      toast.success('Documento generado exitosamente');
+    } catch (error) {
+      console.error('Error al generar documento:', error);
+      toast.error(`Error al generar el documento: ${error.message || 'Error desconocido'}`);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   // Si está cargando, mostrar indicador
-  if (isLoadingCase) {
+  if (isLoadingLawsuit) {
     return (
       <MainLayout title="Cargando caso..." description="Cargando detalles del caso">
         <div className="flex justify-center items-center h-full">
@@ -68,12 +110,12 @@ export default function CaseDetail() {
   }
 
   // Si hay error, mostrar mensaje
-  if (caseError) {
+  if (lawsuitError) {
     return (
       <MainLayout title="Error" description="Error al cargar el caso">
         <div className="bg-red-900 text-red-200 p-4 rounded-lg">
           <h2 className="text-xl font-bold mb-2">Error al cargar el caso</h2>
-          <p>{caseError.message}</p>
+          <p>{lawsuitError.message || 'Error desconocido'}</p>
           <Link href="/dashboard">
             <button className="mt-4 btn-primary">Volver al Dashboard</button>
           </Link>
@@ -83,7 +125,7 @@ export default function CaseDetail() {
   }
 
   // Si no hay datos, mostrar mensaje
-  if (!caseData) {
+  if (!lawsuit) {
     return (
       <MainLayout title="Caso no encontrado" description="El caso solicitado no existe">
         <div className="bg-dark p-6 rounded-lg text-center">
@@ -97,10 +139,13 @@ export default function CaseDetail() {
     );
   }
 
+  // Construir título de la página
+  const pageTitle = lawsuit.subjectMatter || 'Detalles de caso';
+
   return (
     <MainLayout 
-      title={caseData.title} 
-      description={`Detalles del caso: ${caseData.title}`}
+      title={pageTitle} 
+      description={`Detalles del caso: ${pageTitle}`}
     >
       {/* Cabecera */}
       <div className="mb-6">
@@ -114,7 +159,7 @@ export default function CaseDetail() {
 
       {/* Detalles del caso */}
       <CaseDetails 
-        caseData={caseData} 
+        caseData={lawsuit} 
         onDelete={handleDeleteCase} 
         onStatusChange={handleStatusChange}
         onEdit={handleEditCase}
@@ -149,18 +194,15 @@ export default function CaseDetail() {
       {/* Contenido según pestaña activa */}
       <div className="bg-dark-lighter rounded-lg">
         {activeTab === 'document' ? (
-          isLoadingDocument ? (
-            <div className="p-6 text-center">
-              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
-              <p className="text-gray-400">Cargando documento...</p>
-            </div>
-          ) : documentData ? (
-            <DocumentViewer document={documentData} />
-          ) : (
-            <div className="p-6 text-center">
-              <p className="text-gray-400">No se encontró ningún documento asociado a este caso.</p>
-            </div>
-          )
+          <DocumentViewer 
+            documentData={{
+              title: `Demanda: ${lawsuit.subjectMatter}`,
+              content: markdownContent,
+              status: 'En curso'
+            }} 
+            lawsuit={lawsuit}
+            onGenerateDocument={handleGenerateDocument}
+          />
         ) : (
           <ChatBox caseId={id} />
         )}

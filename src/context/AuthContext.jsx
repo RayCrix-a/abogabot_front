@@ -109,7 +109,8 @@ export function AuthProvider({ children }) {
     login,
     loginWithProvider,
     logout,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    isLoading: loading
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

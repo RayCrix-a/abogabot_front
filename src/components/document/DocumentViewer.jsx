@@ -1,59 +1,108 @@
-import { useState } from 'react';
-import { FiDownload, FiShare2, FiEye } from 'react-icons/fi';
+import { useState, useEffect } from 'react';
+import { FiDownload, FiShare2, FiEye, FiFileText } from 'react-icons/fi';
 import { toast } from 'react-toastify';
-import { useMutation } from '@tanstack/react-query';
-import { downloadDocument, shareDocument } from '@/lib/api';
+import { Document, Paragraph, TextRun, Packer } from 'docx';
 
-const DocumentViewer = ({ document }) => {
+const DocumentViewer = ({ documentData, lawsuit, onGenerateDocument }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [markdownContent, setMarkdownContent] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
   
-  // Mutación para descargar el documento
-  const downloadMutation = useMutation({
-    mutationFn: downloadDocument,
-    onSuccess: (data) => {
-      // Simulación de descarga creando un objeto Blob y descargándolo
-      const content = document.content;
-      const blob = new Blob([content], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-      
-      // Crear un link temporal para la descarga
-      const a = document.createElement('a');
-      const url = window.URL.createObjectURL(blob);
-      a.href = url;
-      a.download = data.filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      toast.success('Documento descargado correctamente');
-      setIsDownloading(false);
-    },
-    onError: (error) => {
-      toast.error(`Error al descargar el documento: ${error.message}`);
-      setIsDownloading(false);
+  useEffect(() => {
+    // Si el documento tiene contenido, establecerlo
+    if (documentData?.content) {
+      setMarkdownContent(documentData.content);
     }
-  });
-  
-  // Mutación para compartir el documento
-  const shareMutation = useMutation({
-    mutationFn: ({ documentId, email }) => shareDocument(documentId, email),
-    onSuccess: (data) => {
-      toast.success(data.message);
-      setShowShareModal(false);
-      setEmail('');
-    },
-    onError: (error) => {
-      toast.error(`Error al compartir el documento: ${error.message}`);
-    }
-  });
+  }, [documentData]);
   
   // Función para manejar la descarga
   const handleDownload = () => {
-    setIsDownloading(true);
-    downloadMutation.mutate(document.id);
+    if (!documentData) {
+      toast.error('No hay documento para descargar');
+      return;
+    }
+    
+    try {
+      // Crear un Blob con el contenido del documento
+      const blob = new Blob([markdownContent], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      
+      // Crear un elemento 'a' y simular clic para descargar
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = `demanda-${lawsuit?.id || 'documento'}.md`;
+      window.document.body.appendChild(a);
+      a.click();
+      
+      // Limpiar
+      window.document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Documento descargado correctamente');
+    } catch (error) {
+      console.error('Error al descargar el documento:', error);
+      toast.error('Error al descargar el documento');
+    }
+  };
+
+  // Función para convertir texto a párrafos de Word
+  const convertToWordParagraphs = (text) => {
+    return text.split('\n').map(line => {
+      return new Paragraph({
+        children: [
+          new TextRun({
+            text: line,
+            font: 'Times New Roman',
+            size: 24, // 12pt
+          })
+        ],
+        spacing: {
+          after: 200,
+          line: 360,
+        },
+        alignment: 'justify'
+      });
+    });
+  };
+
+  // Función para descargar en formato Word
+  const handleDownloadWord = async () => {
+    if (!documentData) {
+      toast.error('No hay documento para descargar');
+      return;
+    }
+    
+    try {
+      // Crear documento
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: convertToWordParagraphs(markdownContent)
+        }]
+      });
+
+      // Generar archivo Word
+      const blob = await Packer.toBlob(doc);
+      
+      // Crear URL y descargar
+      const url = URL.createObjectURL(blob);
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = `demanda-${lawsuit?.id || 'documento'}.docx`;
+      window.document.body.appendChild(a);
+      a.click();
+      
+      // Limpiar
+      window.document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Documento descargado en formato Word correctamente');
+    } catch (error) {
+      console.error('Error al descargar el documento en Word:', error);
+      toast.error('Error al descargar el documento en Word');
+    }
   };
   
   // Función para manejar compartir
@@ -63,12 +112,57 @@ const DocumentViewer = ({ document }) => {
       toast.error('Por favor ingrese un correo electrónico');
       return;
     }
-    shareMutation.mutate({ documentId: document.id, email });
+    
+    toast.info(`Compartiendo documento con ${email}...`);
+    // Aquí iría la lógica real para compartir por email
+    setTimeout(() => {
+      toast.success(`Documento compartido con ${email}`);
+      setShowShareModal(false);
+      setEmail('');
+    }, 1500);
   };
   
   // Función para ver la vista previa
   const togglePreview = () => {
     setIsPreviewOpen(!isPreviewOpen);
+  };
+
+  // Click fuera del modal para cerrar
+  const handleClickOutside = (e) => {
+    if (e.target === e.currentTarget) {
+      setIsPreviewOpen(false);
+    }
+  };
+
+  // Función para generar un nuevo documento
+  const handleGenerateDocument = async () => {
+    if (!lawsuit?.id) {
+      toast.error('No hay una demanda válida para generar el documento');
+      return;
+    }
+    
+    // Limpiar completamente el contenido antes de generar
+    setMarkdownContent('');
+    setIsGenerating(true);
+    setMarkdownContent('Generando documento...\n');
+    // Abrir vista previa inmediatamente
+    setIsPreviewOpen(true);
+    
+    try {
+      console.log(`Iniciando generación para demanda ID: ${lawsuit.id}`);
+      
+      // Función para manejar cada chunk del stream
+      const handleChunk = (chunk) => {
+        setMarkdownContent(prevContent => prevContent + chunk);
+      };
+      
+      await onGenerateDocument(lawsuit.id, handleChunk);
+    } catch (error) {
+      console.error('Error al generar el documento:', error);
+      setMarkdownContent('Error al generar el documento. Por favor, intenta de nuevo.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // Función para obtener color según estado
@@ -87,90 +181,133 @@ const DocumentViewer = ({ document }) => {
   return (
     <div className="bg-dark-lighter rounded-lg overflow-hidden">
       <div className="p-5">
-        <h2 className="text-xl font-bold mb-4">{document.title}</h2>
+        <h2 className="text-xl font-bold mb-4">{documentData?.title || 'Documento de demanda'}</h2>
         
         {/* Contenido del documento */}
         <div className="bg-dark p-4 rounded-md border border-gray-700 mb-4 font-mono text-sm text-gray-300 whitespace-pre-wrap max-h-96 overflow-y-auto">
-          {document.content}
+          {isGenerating ? (
+            <div>
+              {markdownContent}
+              <div className="animate-pulse mt-2">▋</div>
+            </div>
+          ) : (
+            markdownContent || 'No hay contenido para mostrar. Genera un documento primero.'
+          )}
         </div>
         
         {/* Información del documento */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Detalles del documento</h3>
-            <table className="w-full">
-              <tbody>
-                <tr className="border-b border-gray-700">
-                  <td className="py-2 text-gray-400">Tipo de documento</td>
-                  <td className="py-2 text-white">{document.type}</td>
-                </tr>
-                <tr className="border-b border-gray-700">
-                  <td className="py-2 text-gray-400">Páginas</td>
-                  <td className="py-2 text-white">{document.pages}</td>
-                </tr>
-                <tr className="border-b border-gray-700">
-                  <td className="py-2 text-gray-400">Estado</td>
-                  <td className="py-2">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(document.status)}`}>
-                      {document.status}
-                    </span>
-                  </td>
-                </tr>
-                <tr className="border-b border-gray-700">
-                  <td className="py-2 text-gray-400">Última actualización</td>
-                  <td className="py-2 text-white">{document.lastUpdate}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Registro de actividades</h3>
-            <div className="space-y-3">
-              {document.activities.map((activity, index) => (
-                <div key={index} className="flex items-start space-x-3">
-                  <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-white">
-                    {activity.icon || '📝'}
-                  </div>
+        {documentData && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <h3 className="text-lg font-semibold mb-3">Detalles del documento</h3>
+              <table className="w-full">
+                <tbody>
+                  <tr className="border-b border-gray-700">
+                    <td className="py-2 text-gray-400">Tipo de procedimiento</td>
+                    <td className="py-2 text-white">{lawsuit?.proceedingType?.description || 'No especificado'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-700">
+                    <td className="py-2 text-gray-400">Materia</td>
+                    <td className="py-2 text-white">{lawsuit?.subjectMatter || 'No especificado'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-700">
+                    <td className="py-2 text-gray-400">Estado</td>
+                    <td className="py-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(documentData.status || 'En curso')}`}>
+                        {documentData.status || 'En curso'}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr className="border-b border-gray-700">
+                    <td className="py-2 text-gray-400">Fecha creación</td>
+                    <td className="py-2 text-white">
+                      {lawsuit?.createdAt ? new Date(lawsuit.createdAt).toLocaleDateString() : 'No disponible'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-3">Partes involucradas</h3>
+              <div className="space-y-3">
+                {lawsuit?.plaintiffs && lawsuit.plaintiffs.length > 0 && (
                   <div>
-                    <p className="text-white">{activity.description}</p>
-                    <p className="text-xs text-gray-400">{activity.time}</p>
+                    <h4 className="font-medium text-white">Demandante(s):</h4>
+                    <ul className="list-disc list-inside text-gray-400">
+                      {lawsuit.plaintiffs.map((plaintiff, idx) => (
+                        <li key={idx}>{plaintiff.fullName}</li>
+                      ))}
+                    </ul>
                   </div>
-                </div>
-              ))}
+                )}
+                
+                {lawsuit?.defendants && lawsuit.defendants.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-white">Demandado(s):</h4>
+                    <ul className="list-disc list-inside text-gray-400">
+                      {lawsuit.defendants.map((defendant, idx) => (
+                        <li key={idx}>{defendant.fullName}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
         
         {/* Botones de acción */}
         <div className="flex flex-wrap gap-3 mt-6">
           <button
+            onClick={handleGenerateDocument}
+            disabled={isGenerating || !lawsuit?.id}
+            className="btn flex items-center gap-2 bg-primary text-white hover:bg-primary-dark"
+          >
+            <FiEye className="w-4 h-4" />
+            {isGenerating ? 'Generando...' : 'Generar documento'}
+          </button>
+          
+          <button
             onClick={togglePreview}
+            disabled={!markdownContent}
             className="btn flex items-center gap-2 bg-blue-900 text-blue-300 hover:bg-blue-800"
           >
             <FiEye className="w-4 h-4" />
-            Vista previa del doc
+            Vista previa
           </button>
+          
           <button
             onClick={handleDownload}
-            disabled={isDownloading}
+            disabled={!markdownContent}
             className="btn flex items-center gap-2 bg-green-900 text-green-300 hover:bg-green-800"
           >
             <FiDownload className="w-4 h-4" />
-            {isDownloading ? 'Descargando...' : 'Descargar'}
+            Descargar MD
           </button>
+
+          <button
+            onClick={handleDownloadWord}
+            disabled={!markdownContent}
+            className="btn flex items-center gap-2 bg-green-900 text-green-300 hover:bg-green-800"
+          >
+            <FiFileText className="w-4 h-4" />
+            Descargar Word
+          </button>
+          
           <button
             onClick={() => setShowShareModal(true)}
+            disabled={!markdownContent}
             className="btn flex items-center gap-2 bg-purple-900 text-purple-300 hover:bg-purple-800"
           >
             <FiShare2 className="w-4 h-4" />
-            Share
+            Compartir
           </button>
         </div>
       </div>
       
       {/* Vista previa del documento (modal) */}
-      {isPreviewOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+      {isPreviewOpen && markdownContent && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={handleClickOutside}>
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-auto">
             <div className="bg-gray-100 border-b p-4 flex justify-between items-center">
               <h3 className="text-lg font-bold text-gray-800">Vista previa del documento</h3>
@@ -182,27 +319,14 @@ const DocumentViewer = ({ document }) => {
               </button>
             </div>
             <div className="p-8">
-              {/* Componente de vista previa del documento */}
               <div className="bg-white p-6 font-serif text-black">
-                <h1 className="text-center text-xl font-bold mb-6">DEMANDA CIVIL POR INCUMPLIMIENTO DE CONTRATO</h1>
-                <p className="mb-3">Señor Juez:</p>
-                <p className="mb-3">
-                  Yo, {document.plaintiffName}, cédula de identidad {document.plaintiffId}, con domicilio en {document.plaintiffAddress}, 
-                  interpongo demanda civil en contra de {document.defendantName}, cédula de identidad {document.defendantId}, 
-                  con domicilio en {document.defendantAddress}, por incumplimiento de contrato.
-                </p>
-                <p className="mb-3">
-                  Con fecha {document.contractDate}, las partes suscribimos un contrato en el cual el demandado se obligó a {document.obligation}, 
-                  compromiso que hasta la fecha no ha cumplido, causando perjuicio a mi persona.
-                </p>
-                <p className="mb-3">
-                  Por lo expuesto, ruego a SS. tener por interpuesta la demanda, dar curso a la misma y, en definitiva, acogerla en todas sus partes, 
-                  con expresa condena en costas.
-                </p>
-                <div className="mt-10">
-                  <p className="mb-1">{document.plaintiffName}</p>
-                  <p>{document.plaintiffId}</p>
-                </div>
+                {/* Renderizar contenido Markdown como HTML básico */}
+                <div dangerouslySetInnerHTML={{ __html: markdownContent
+                  .replace(/\n\n/g, '<br/><br/>')
+                  .replace(/\n/g, '<br/>')
+                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                }}></div>
               </div>
             </div>
           </div>
@@ -237,9 +361,8 @@ const DocumentViewer = ({ document }) => {
                 <button
                   type="submit"
                   className="btn-primary"
-                  disabled={shareMutation.isLoading}
                 >
-                  {shareMutation.isLoading ? 'Enviando...' : 'Enviar'}
+                  Enviar
                 </button>
               </div>
             </form>

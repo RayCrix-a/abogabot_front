@@ -3,29 +3,33 @@ import { FiSearch, FiClock, FiArchive } from 'react-icons/fi';
 import Link from 'next/link';
 import MainLayout from '@/components/layout/MainLayout';
 import CaseCard from '@/components/cases/CaseCard';
-import { useCases } from '@/hooks/useCases';
+import { useLawsuits } from '@/hooks/useLawsuits';
+import { parseISO } from 'date-fns';
 
 export default function HistoryPage() {
-  const { cases, isLoadingCases } = useCases();
+  const { lawsuits, isLoadingLawsuits } = useLawsuits();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState('all'); // 'all', 'recent', 'closed'
+  const [filter, setFilter] = useState('all'); // 'all', 'recent'
 
-  // Filtramos solo los casos finalizados para el historial
-  const historyCases = cases?.filter(caseItem => 
-    caseItem.status === 'Finalizado' || caseItem.status === 'Completado'
-  );
+  // Filtrar para mostrar solo los casos finalizados
+  const historyCases = (lawsuits || []).filter(c => c.status === 'Finalizado');
 
   // Aplicamos filtros de búsqueda y tipo
-  const filteredCases = historyCases?.filter(caseItem => {
-    const matchesSearch = caseItem.title.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredCases = historyCases.filter(caseItem => {
+    const matchesSearch = caseItem.subjectMatter?.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (filter === 'all') return matchesSearch;
     if (filter === 'recent') {
       // Casos de los últimos 30 días
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const caseDate = new Date(caseItem.createdAt);
-      return matchesSearch && caseDate >= thirtyDaysAgo;
+      try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const caseDate = parseISO(caseItem.createdAt);
+        return matchesSearch && caseDate >= thirtyDaysAgo;
+      } catch (error) {
+        console.error('Error al filtrar por fecha:', error);
+        return matchesSearch;
+      }
     }
     
     return matchesSearch;
@@ -68,7 +72,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Lista de casos del historial */}
-      {isLoadingCases ? (
+      {isLoadingLawsuits ? (
         <div className="text-center py-6">
           <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
           <p className="text-gray-400">Cargando historial...</p>
@@ -104,16 +108,20 @@ export default function HistoryPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-dark p-4 rounded-lg border border-gray-700">
-              <p className="text-gray-400 text-sm">Total de casos finalizados</p>
+              <p className="text-gray-400 text-sm">Total de casos</p>
               <p className="text-2xl font-bold text-white">{historyCases?.length || 0}</p>
             </div>
             <div className="bg-dark p-4 rounded-lg border border-gray-700">
               <p className="text-gray-400 text-sm">Casos del último mes</p>
               <p className="text-2xl font-bold text-white">
                 {historyCases?.filter(c => {
-                  const thirtyDaysAgo = new Date();
-                  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                  return new Date(c.createdAt) >= thirtyDaysAgo;
+                  try {
+                    const thirtyDaysAgo = new Date();
+                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                    return new Date(c.createdAt) >= thirtyDaysAgo;
+                  } catch (error) {
+                    return false;
+                  }
                 }).length || 0}
               </p>
             </div>

@@ -6,12 +6,21 @@ import '@/styles/globals.css';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function App({ Component, pageProps }) {
-  // Crear cliente de React Query
+  // Crear cliente de React Query con configuración
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
         refetchOnWindowFocus: false,
-        retry: 1
+        staleTime: 60 * 1000, // 1 minuto
+        retry: 1,
+        onError: (err) => {
+          console.error('Query error:', err);
+        }
+      },
+      mutations: {
+        onError: (err) => {
+          console.error('Mutation error:', err);
+        }
       }
     }
   }));

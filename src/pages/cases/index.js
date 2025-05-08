@@ -3,19 +3,19 @@ import { FiSearch, FiPlus } from 'react-icons/fi';
 import Link from 'next/link';
 import MainLayout from '@/components/layout/MainLayout';
 import CaseCard from '@/components/cases/CaseCard';
-import { useCases } from '@/hooks/useCases';
+import { useLawsuits } from '@/hooks/useLawsuits';
 
 export default function CasesIndex() {
-  const { cases, isLoadingCases } = useCases();
+  const { lawsuits, isLoadingLawsuits } = useLawsuits();
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all'); // 'all', 'active', 'pending'
 
-  // Filtrar primero para excluir los casos finalizados de la lista principal
-  const activeCases = cases?.filter(caseItem => caseItem.status !== 'Finalizado') || [];
+  // Filtrar primero para excluir los casos finalizados
+  const activeCases = (lawsuits || []).filter(c => c.status !== 'Finalizado');
 
   // Aplicar filtros de búsqueda y estado
   const filteredCases = activeCases.filter(caseItem => {
-    const matchesSearch = caseItem.title.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = caseItem.subjectMatter?.toLowerCase().includes(searchTerm.toLowerCase());
     
     if (filter === 'all') return matchesSearch;
     if (filter === 'active') return matchesSearch && caseItem.status === 'En curso';
@@ -69,7 +69,7 @@ export default function CasesIndex() {
       </div>
 
       {/* Lista de casos */}
-      {isLoadingCases ? (
+      {isLoadingLawsuits ? (
         <div className="text-center py-6">
           <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
           <p className="text-gray-400">Cargando casos...</p>

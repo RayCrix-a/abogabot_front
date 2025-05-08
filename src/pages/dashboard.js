@@ -2,96 +2,86 @@ import { useState, useEffect } from 'react';
 import { FiPlus, FiFolder, FiClock, FiSearch, FiEdit, FiTrash2, FiFileText } from 'react-icons/fi';
 import MainLayout from '@/components/layout/MainLayout';
 import CaseCard from '@/components/cases/CaseCard';
-import { useCases } from '@/hooks/useCases';
+import { useLawsuits } from '@/hooks/useLawsuits';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Dashboard() {
-  const { cases, isLoadingCases } = useCases();
+  const { lawsuits, isLoadingLawsuits } = useLawsuits();
   const [searchTerm, setSearchTerm] = useState('');
   const { user } = useAuth();
   const [recentActivities, setRecentActivities] = useState([]);
 
   // Filtrar casos activos (no finalizados)
-  const activeCases = cases?.filter(c => c.status !== 'Finalizado') || [];
+  const activeCases = (lawsuits || []).filter(c => c.status !== 'Finalizado');
 
   // Obtener los 3 casos más recientes
-  const recentCases = [...activeCases]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  const recentCases = [...(activeCases || [])]
+    .sort((a, b) => {
+      // Ordenar por fecha de creación (más recientes primero)
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      return dateB - dateA;
+    })
     .slice(0, 3);
 
   // Filtrar casos según término de búsqueda
   const filteredCases = recentCases.filter(caseItem => 
-    caseItem.title.toLowerCase().includes(searchTerm.toLowerCase())
+    caseItem.subjectMatter?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // Función para formatear la fecha
-  const formatActivityDate = (date) => {
-    const now = new Date();
-    const activityDate = new Date(date);
-    
-    const diffInMinutes = Math.floor((now - activityDate) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Ahora mismo';
-    if (diffInMinutes < 60) return `Hace ${diffInMinutes} minutos`;
-    
-    const diffInHours = Math.floor(diffInMinutes / 60);
-    if (diffInHours < 24) return `Hace ${diffInHours} horas`;
-    
-    return format(activityDate, "d 'de' MMMM", { locale: es });
+  const formatActivityDate = (dateString) => {
+    try {
+      const date = parseISO(dateString);
+      const now = new Date();
+      
+      const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+      
+      if (diffInMinutes < 1) return 'Ahora mismo';
+      if (diffInMinutes < 60) return `Hace ${diffInMinutes} minutos`;
+      
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      if (diffInHours < 24) return `Hace ${diffInHours} horas`;
+      
+      return format(date, "d 'de' MMMM", { locale: es });
+    } catch (error) {
+      console.error('Error al formatear fecha:', error);
+      return dateString || 'Fecha no disponible';
+    }
   };
 
-  // Generar actividades recientes basadas en los casos (simulación)
+  // Generar actividades recientes basadas en los casos
   useEffect(() => {
-    if (cases) {
+    if (lawsuits && lawsuits.length > 0) {
       const activities = [];
       
-      // Añadir actividades de casos recientes
-      cases.forEach(caseItem => {
-        // Crear actividad de caso creado
+      // Simular actividades basadas en las demandas existentes
+      lawsuits.forEach(lawsuit => {
+        // Actividad de creación
         activities.push({
-          id: `act-create-${caseItem.id}`,
-          description: `Caso creado: ${caseItem.title}`,
-          timestamp: caseItem.createdAt,
+          id: `create-${lawsuit.id}`,
+          description: `Caso creado: ${lawsuit.subjectMatter}`,
+          timestamp: lawsuit.createdAt,
           icon: <FiFileText className="text-blue-500" />,
           type: 'create',
-          caseId: caseItem.id
+          caseId: lawsuit.id
         });
-        
-        // Si tiene lastUpdated, añadir actividad de actualización
-        if (caseItem.lastUpdated) {
-          activities.push({
-            id: `act-update-${caseItem.id}`,
-            description: `Caso actualizado: ${caseItem.title}`,
-            timestamp: caseItem.lastUpdated,
-            icon: <FiEdit className="text-yellow-500" />,
-            type: 'update',
-            caseId: caseItem.id
-          });
-        }
-        
-        // Si tiene status finalizado, añadir actividad de finalización
-        if (caseItem.status === 'Finalizado') {
-          activities.push({
-            id: `act-finish-${caseItem.id}`,
-            description: `Caso finalizado: ${caseItem.title}`,
-            timestamp: caseItem.lastUpdated || caseItem.createdAt,
-            icon: <FiClock className="text-green-500" />,
-            type: 'finish',
-            caseId: caseItem.id
-          });
-        }
       });
       
       // Ordenar actividades por timestamp (más reciente primero)
-      activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      activities.sort((a, b) => {
+        const dateA = new Date(a.timestamp);
+        const dateB = new Date(b.timestamp);
+        return dateB - dateA;
+      });
       
       // Tomar las 5 actividades más recientes
       setRecentActivities(activities.slice(0, 5));
     }
-  }, [cases]);
+  }, [lawsuits]);
 
   return (
     <MainLayout title="Dashboard" description="Gestione sus casos legales con AbogaBot">
@@ -116,7 +106,6 @@ export default function Dashboard() {
             className="input-field pl-10 w-full"
           />
         </div>
-        
         <Link href="/cases/new">
           <button className="btn-primary flex items-center gap-2">
             <FiPlus className="w-5 h-5" />
@@ -135,7 +124,7 @@ export default function Dashboard() {
           </Link>
         </div>
         
-        {isLoadingCases ? (
+        {isLoadingLawsuits ? (
           <div className="text-center py-6">
             <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-2"></div>
             <p className="text-gray-400">Cargando casos...</p>
@@ -148,7 +137,11 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="bg-dark p-6 rounded-lg text-center">
-            <p className="text-gray-400 mb-4">No se encontraron casos recientes</p>
+            <p className="text-gray-400 mb-4">
+              {searchTerm
+                ? 'No se encontraron casos que coincidan con tu búsqueda'
+                : 'No tienes casos recientes'}
+            </p>
             <Link href="/cases/new">
               <button className="btn-primary">Crear primer caso</button>
             </Link>
