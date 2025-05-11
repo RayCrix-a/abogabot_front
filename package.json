@@ -25,6 +25,7 @@
     "zod": "^3.21.4"
   },
   "devDependencies": {
+    "@types/swagger-schema-official": "^2.0.25",
     "@types/node": "22.13.17",
     "@types/react": "19.0.12",
     "autoprefixer": "^10.4.21",

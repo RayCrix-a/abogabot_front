@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { lawsuitResource, getCases, getCaseById, deleteCase, updateCase, updateCaseStatus } from '@/lib/apiClient';
+import { lawsuitResource } from '@/lib/apiClient';
 import { toast } from 'react-toastify';
 
 /**
@@ -17,7 +17,10 @@ export const useCases = () => {
     refetch: refetchCases
   } = useQuery({
     queryKey: ['cases'],
-    queryFn: getCases
+    queryFn: async () => {
+      const response = await lawsuitResource.getAllLawsuits();
+      return response.data;
+    }
   });
 
   // Mutación para crear un nuevo caso
@@ -51,7 +54,10 @@ export const useCases = () => {
 
   // Mutación para eliminar un caso
   const deleteCaseMutation = useMutation({
-    mutationFn: deleteCase,
+    mutationFn: async (id) => {
+      const response = await lawsuitResource.deleteLawsuit(id);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       toast.success('Caso eliminado exitosamente');
@@ -63,7 +69,10 @@ export const useCases = () => {
 
   // Mutación para actualizar un caso
   const updateCaseMutation = useMutation({
-    mutationFn: ({ id, data }) => updateCase(id, data),
+    mutationFn: async ({ id, data }) => {
+      const response = await lawsuitResource.updateLawsuit(id, data);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['case'] });
@@ -76,7 +85,10 @@ export const useCases = () => {
 
   // Mutación para actualizar el estado de un caso
   const updateCaseStatusMutation = useMutation({
-    mutationFn: ({ id, status }) => updateCaseStatus(id, status),
+    mutationFn: async ({ id, status }) => {
+      const response = await lawsuitResource.updateLawsuitStatus(id, status);
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cases'] });
       queryClient.invalidateQueries({ queryKey: ['case'] });
@@ -86,7 +98,6 @@ export const useCases = () => {
       toast.error(`Error al actualizar el estado: ${error.message}`);
     }
   });
-
   /**
    * Función para obtener un caso por ID
    * @param {string} id - Identificador del caso
@@ -95,11 +106,13 @@ export const useCases = () => {
   const useCase = (id) => {
     return useQuery({
       queryKey: ['case', id],
-      queryFn: () => getCaseById(id),
+      queryFn: async () => {
+        const response = await lawsuitResource.getLawsuitById(id);
+        return response.data;
+      },
       enabled: !!id // Solo ejecutar si hay un ID
     });
   };
-
   return {
     cases,
     isLoadingCases,
