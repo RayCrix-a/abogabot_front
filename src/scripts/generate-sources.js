@@ -9,8 +9,9 @@ async function main() {
         output: path.resolve(process.cwd(), "src/generated/api"),
         cleanOutput: true,
         moduleNameFirstTag: true,
-        modular: true
-    } as any);
+        modular: true,
+        toJS: true
+    });
 }
 
 main().catch(console.error);

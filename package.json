@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "generate-sources": "dotenv -- tsx ./src/scripts/generate-sources.ts",
+    "generate-sources": "dotenv -- tsx ./src/scripts/generate-sources.js",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
