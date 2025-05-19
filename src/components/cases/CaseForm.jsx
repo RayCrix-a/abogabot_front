@@ -504,7 +504,7 @@ const CaseForm = () => {
           className="btn-primary flex items-center gap-2"
         >
           <FiFileText className="w-4 h-4" />
-          {saving ? 'Generando...' : 'Generar demanda'}
+          {saving ? 'Generando...' : 'Crear caso'}
         </button>
       </div>
     </form>
