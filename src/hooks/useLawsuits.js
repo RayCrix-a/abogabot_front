@@ -163,8 +163,9 @@ export const useLawsuits = () => {
       console.log(`Iniciando generación de documento para caso ID: ${id}`);
       
       const response = await lawsuitResource.request({
-        path: `/lawsuit/generate?id=${id}`,
+        path: `/lawsuit/${id}/generate`,
         method: 'POST',
+        baseUrl: process.env.NEXT_PUBLIC_ABOGABOT_GENERATOR_URL,
         headers: {
           'Content-Type': 'application/json',
           'Accept': '*/*',
