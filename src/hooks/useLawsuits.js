@@ -71,6 +71,21 @@ export const useLawsuits = () => {
       console.error('Error al eliminar demanda:', error);
       toast.error(`Error al eliminar la demanda: ${error.message || 'Error desconocido'}`);
     }
+  });  // Mutación para actualizar el estado de una demanda
+  const updateLawsuitStatusMutation = useMutation({
+    mutationFn: async ({ id, status }) => {
+      const response = await lawsuitResource.updateLawsuit(id, { status });
+      return response.data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries(['lawsuits']);
+      queryClient.invalidateQueries(['lawsuit', variables.id]);
+      toast.success('Estado actualizado correctamente');
+    },
+    onError: (error) => {
+      console.error('Error al actualizar el estado:', error);
+      toast.error(`Error al actualizar el estado: ${error.message || 'Error desconocido'}`);
+    }
   });
 
   /**
@@ -113,6 +128,7 @@ export const useLawsuits = () => {
    * @returns {string} - Query result con las revisiones
    */
     const useLawsuitLastRevisions= (id) => {
+      
       return useQuery({
         queryKey: ['lawsuit-last-revisions', id],
         queryFn: async () => {
@@ -121,16 +137,8 @@ export const useLawsuits = () => {
           const innerResponse = response.data;
           if (innerResponse.length === 0) return null;
           const lastRevision = innerResponse.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
-          const responseRevision = await lawsuitResource.getRevision(id, lastRevision.uuid);
-          const url = responseRevision.data.url;
-          const responseFile = await fetch(url, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': '*/*',
-            },
-          });
-          return await responseFile.text();
+          const responseRevision = await lawsuitResource.getRevisionResponse(id, lastRevision.uuid);
+          return await responseRevision.text()
         },
         enabled: !!id
       });
@@ -147,7 +155,7 @@ export const useLawsuits = () => {
       queryKey: ['lawsuit-revision', id, uuid],
       queryFn: async () => {
         if (!id || !uuid) return null;
-        const response = await lawsuitResource.getRevision(id, uuid);
+        const response = await lawsuitResource.getRevisionResponse(id, uuid);
         return response.data;
       },
       enabled: !!(id && uuid)
@@ -220,6 +228,8 @@ export const useLawsuits = () => {
     isUpdatingLawsuit: updateLawsuitMutation.isLoading,
     deleteLawsuit: deleteLawsuitMutation.mutate,
     isDeletingLawsuit: deleteLawsuitMutation.isLoading,
+    updateLawsuitStatus: (id, status) => updateLawsuitStatusMutation.mutate({ id, status }),
+    isUpdatingStatus: updateLawsuitStatusMutation.isLoading,
     loading,
     error,
     generate
