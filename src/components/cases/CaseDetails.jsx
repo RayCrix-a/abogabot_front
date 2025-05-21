@@ -7,6 +7,7 @@ import EditCaseForm from './EditCaseForm';
 
 const CaseDetails = ({ caseData, onDelete, onStatusChange }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   
   // Función para formatear la fecha
@@ -24,18 +25,24 @@ const CaseDetails = ({ caseData, onDelete, onStatusChange }) => {
 const handleDelete = async () => {
   if (isConfirmingDelete) {
     try {
+      setIsDeleting(true);
       console.log('Usuario confirmó eliminación en CaseDetails');
+      console.log('Llamando a onDelete() - ID de caso:', caseData?.id);
       const success = await onDelete();
       console.log('Resultado de onDelete:', success);
       if (success) {
         setIsConfirmingDelete(false);
+        // No añadimos toast aquí porque se manejará en useLawsuits.js o [id].js
       } else {
+        toast.error('No se pudo eliminar el caso');
         console.log('onDelete no retornó true, manteniendo estado de confirmación');
       }
     } catch (error) {
       console.error('Error capturado en CaseDetails durante eliminación:', error);
-      // No es necesario hacer nada más aquí, el error ya debería ser manejado en [id].js
+      toast.error(`Error al eliminar el caso: ${error.message || 'Error desconocido'}`);
       setIsConfirmingDelete(false); // Reset del estado para permitir intentar de nuevo
+    } finally {
+      setIsDeleting(false);
     }
   } else {
     setIsConfirmingDelete(true);
@@ -154,20 +161,28 @@ const handleDelete = async () => {
             <FiEdit className="w-4 h-4" />
             <span className="hidden sm:inline">Editar</span>
           </button>
-          
-          {isConfirmingDelete ? (
+            {isConfirmingDelete ? (
             <div className="flex space-x-2">
               <button
                 onClick={cancelDelete}
                 className="btn py-2 px-3 bg-gray-700 text-white"
+                disabled={isDeleting}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleDelete}
-                className="btn py-2 px-3 bg-red-600 text-white"
+                className="btn py-2 px-3 bg-red-600 text-white flex items-center gap-1"
+                disabled={isDeleting}
               >
-                Confirmar
+                {isDeleting ? (
+                  <>
+                    <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                    Eliminando...
+                  </>
+                ) : (
+                  'Confirmar'
+                )}
               </button>
             </div>
           ) : (
