@@ -48,9 +48,8 @@ const caseSchema = z.object({
 
 const CaseForm = () => {
   const router = useRouter();
-  const [saving, setSaving] = useState(false);
-  const [claimInput, setClaimInput] = useState('');
-  const [claimsList, setClaimsList] = useState(['DEMANDA CIVIL']);
+  const [saving, setSaving] = useState(false);  const [claimInput, setClaimInput] = useState('');
+  const [claimsList, setClaimsList] = useState([]);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [selectedPredefinedClaim, setSelectedPredefinedClaim] = useState('');
   
@@ -77,12 +76,11 @@ const CaseForm = () => {
       attorneyId: '',
       attorneyName: '',
       attorneyAddress: '',
-      representativeId: '',
-      representativeName: '',
+      representativeId: '',      representativeName: '',
       representativeAddress: '',
       institution: 'S.J.L. EN LO CIVIL',
       description: '',
-      claims: ['DEMANDA CIVIL']
+      claims: []
     }
   });
 
@@ -516,7 +514,7 @@ const CaseForm = () => {
       
       {/* Peticiones al tribunal */}
       <div>
-        <label className="block mb-1 text-gray-300">Peticiones</label>
+        <label className="block mb-1 text-gray-300">Peticiones al tribunal</label>
         <div className="space-y-4">
           {/* Selector de peticiones predefinidas y botón de agregar */}
           <div className="flex items-center gap-3">
@@ -566,24 +564,29 @@ const CaseForm = () => {
               </button>
             </div>
           )}
-
+          
           {/* Lista de peticiones añadidas */}
-          <div className="flex flex-wrap gap-2">
-            {claimsList.map((claim, index) => (
-              <div
-                key={index}
-                className="group flex items-center bg-[#1e2736] text-gray-200 px-3 py-1.5 rounded-md text-sm border border-gray-600 shadow-sm hover:border-indigo-500 transition-colors duration-200"
-              >
-                <span className="inline-block">{claim}</span>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteClaim(claim)}
-                  className="ml-2 p-1 rounded-full hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors duration-200"
-                >
-                  <FiX size={14} />
-                </button>
-              </div>
-            ))}
+          <div className="bg-dark p-3 rounded-md min-h-[60px] border border-gray-700">
+            {claimsList.length > 0 ? (
+              <ul className="space-y-2">
+                {claimsList.map((claim, index) => (
+                  <li key={index} className="flex justify-between items-start p-2 bg-dark-light rounded">
+                    <span className="text-gray-300 break-words pr-2" style={{ wordBreak: 'break-word', flex: '1' }}>
+                      {claim}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteClaim(claim)}
+                      className="text-red-500 hover:text-red-400 ml-2 flex-shrink-0"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-white-500 text-sm p-2 text-center">No hay peticiones agregadas</p>
+            )}
           </div>
         </div>
       </div>
