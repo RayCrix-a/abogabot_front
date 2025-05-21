@@ -55,50 +55,95 @@ export const useLawsuits = () => {
       console.error('Error al actualizar demanda:', error);
       toast.error(`Error al actualizar la demanda: ${error.message || 'Error desconocido'}`);
     }
+  });  // Mutación para eliminar una demanda
+  const deleteLawsuitMutation = useMutation({
+    mutationFn: async (id) => {
+      console.log('Ejecutando mutación para eliminar demanda con ID:', id);
+      try {
+        // Llamada explícita a la API usando el método deleteLawsuit
+        const response = await lawsuitResource.deleteLawsuit(id);
+        console.log('Respuesta de eliminación:', response);
+        // Validar la respuesta
+        if (!response || response.status >= 400) {
+          throw new Error(`Error al eliminar la demanda: ${response?.statusText || 'Error desconocido'}`);
+        }
+        return response.data;
+      } catch (error) {
+        console.error('Error en la llamada a deleteLawsuit:', error);
+        throw error; // Propagar el error para que onError lo maneje
+      }
+    },
+    onMutate: async (deletedId) => {
+      console.log('onMutate iniciado para ID:', deletedId);
+      // Cancelar queries en curso
+      await queryClient.cancelQueries(['lawsuits']);
+      await queryClient.cancelQueries(['lawsuit', deletedId]);
+      
+      // Guardar estado previo
+      const previousLawsuits = queryClient.getQueryData(['lawsuits']);
+      console.log('Estado previo guardado:', previousLawsuits ? 'Sí' : 'No');
+      
+      // Actualizar optimistamente
+      if (previousLawsuits) {
+        queryClient.setQueryData(['lawsuits'], 
+          previousLawsuits.filter(l => l.id !== deletedId)
+        );
+        console.log('Estado actualizado optimistamente');
+      }
+      
+      return { previousLawsuits };
+    },    onSuccess: () => {
+      console.log('Eliminación exitosa, invalidando queries');
+      // Importante: Usar la forma de objeto para invalidateQueries para asegurar que funcione bien con React Query v4+
+      queryClient.invalidateQueries({ queryKey: ['lawsuits'] });
+      queryClient.invalidateQueries({ queryKey: ['lawsuit'] });
+      toast.success('Demanda eliminada exitosamente');
+    },
+    onError: (error, deletedId, context) => {
+      console.error('Error detectado en onError:', error);
+      // Revertir los cambios optimistas
+      if (context?.previousLawsuits) {
+        console.log('Revirtiendo cambios optimistas');
+        queryClient.setQueryData(['lawsuits'], context.previousLawsuits);
+      }
+      console.error('Error al eliminar demanda:', error);
+      toast.error(`Error al eliminar la demanda: ${error.message || 'Error desconocido'}`);
+    },
+    onSettled: () => {
+      console.log('Operación finalizada (onSettled)');
+      queryClient.invalidateQueries({ queryKey: ['lawsuits'] });
+    }
   });
   
-  // Mutación para eliminar una demanda
-const deleteLawsuitMutation = useMutation({
-  onMutate: async (deletedId) => {
-    await queryClient.cancelQueries(['lawsuits']);
-    const previousLawsuits = queryClient.getQueryData(['lawsuits']);
-    
-    // Optimisticamente actualizar la UI
-    if (previousLawsuits) {
-      queryClient.setQueryData(['lawsuits'], 
-        previousLawsuits.filter(l => l.id !== deletedId)
-      );
-    }
-    
-    return { previousLawsuits };
-  },
-  onError: (err, variables, context) => {
-    console.error('Error en mutación de eliminación:', err);
-    
-    // Si algo falla, revertir a los datos anteriores
-    if (context?.previousLawsuits) {
-      queryClient.setQueryData(['lawsuits'], context.previousLawsuits);
-    }
-  },
-  onSettled: () => {
-    // Siempre refrescar los datos
-    queryClient.invalidateQueries(['lawsuits']);
-  }
-});
-
   // Mutación para actualizar el estado de una demanda
   const updateLawsuitStatusMutation = useMutation({
     mutationFn: async ({ id, status }) => {
       const response = await lawsuitResource.updateLawsuit(id, { status });
       return response.data;
     },
-    onSuccess: (_, { id }) => {
+    onSuccess: (_, { id, status }) => {
       queryClient.invalidateQueries(['lawsuits']);
       queryClient.invalidateQueries(['lawsuit', id]);
-      toast.success('Estado actualizado exitosamente');
+      let message = 'Estado actualizado correctamente';
+      switch (status) {
+        case 'IN_PROGRESS':
+          message = 'Caso marcado como en curso';
+          break;
+        case 'PENDING':
+          message = 'Caso marcado como pendiente';
+          break;
+        case 'FINALIZED':
+          message = 'Caso finalizado y movido al historial';
+          break;
+        case 'DRAFT':
+          message = 'Caso guardado como borrador';
+          break;
+      }
+      toast.success(message);
     },
     onError: (error) => {
       console.error('Error al actualizar el estado:', error);
+      toast.error('Error al actualizar el estado del caso');
     }
   });
 

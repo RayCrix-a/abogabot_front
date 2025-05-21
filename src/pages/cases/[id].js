@@ -38,21 +38,37 @@ export default function CaseDetail() {
     if (revision) {
       setMarkdownContent(revision);
     }
-  }, [revision]);  
-  // Manejar eliminación de caso  
+  }, [revision]);  // Manejar eliminación de caso  
 const handleDeleteCase = async () => {
-  if (!id) return false;
+  if (!id) {
+    console.error('No se puede eliminar caso: ID no especificado');
+    return false;
+  }
   
   try {
-    console.log(`Intentando eliminar caso con ID: ${id}`);
-    await deleteLawsuit(id);
-    toast.success('Demanda eliminada exitosamente');
+    console.log('Intentando eliminar caso con ID:', id);
+    // Asegurarnos de que estamos pasando el ID correctamente
+    const numericId = parseInt(id, 10);
+    
+    if (isNaN(numericId)) {
+      console.log('Usando ID como string:', id);
+      await deleteLawsuit(id);
+    } else {
+      console.log('Usando ID como número:', numericId);
+      await deleteLawsuit(numericId);
+    }
+    
+    console.log('Operación de eliminación completada exitosamente');
+    // Desactivar las consultas para evitar que se sigan actualizando
+    queryClient.removeQueries(['lawsuit', id]);
+    
+    // En caso de éxito, redirigir al dashboard
+    toast.success('Caso eliminado exitosamente');
     router.push('/dashboard');
     return true;
   } catch (error) {
-    console.error('Error al eliminar demanda:', error);
-    // Error más específico en el toast para depuración
-    toast.error(`Error al eliminar la demanda: ${error.message || 'Error desconocido'}`);
+    console.error('Error detallado al eliminar demanda:', error);
+    toast.error(`Error al eliminar el caso: ${error.message || 'Error desconocido'}`);
     return false;
   }
 };
