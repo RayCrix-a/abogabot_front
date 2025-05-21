@@ -313,8 +313,7 @@ const EditCaseForm = ({ caseData, onCancel }) => {
         </div>
         
         {/* Lista de peticiones */}
-        <div className={`bg-dark p-3 rounded-md ${errors.claims ? 'border border-red-500' : 'border border-gray-700'}`}>
-          {claimsList.length > 0 ? (
+        <div className={`bg-dark p-3 rounded-md ${errors.claims ? 'border border-red-500' : 'border border-gray-700'}`}>          {claimsList.length > 0 ? (
             <ul className="space-y-2">
               {claimsList.map((claim, index) => (
                 <li key={index} className="flex justify-between items-center p-2 bg-dark-light rounded">
@@ -330,7 +329,7 @@ const EditCaseForm = ({ caseData, onCancel }) => {
               ))}
             </ul>
           ) : (
-            <p className="text-gray-500 text-sm p-2">No hay peticiones añadidas</p>
+            <p className="text-gray-500 text-sm p-2">No hay peticiones agregadas</p>
           )}
         </div>
         {errors.claims && (
