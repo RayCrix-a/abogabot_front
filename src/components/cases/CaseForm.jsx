@@ -4,7 +4,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'react-toastify';
-import { FiSave, FiFileText } from 'react-icons/fi';
+import { FiFileText, FiX } from 'react-icons/fi';
+import { PlusCircle } from 'lucide-react';
 import { useMutation } from '@tanstack/react-query';
 import { useCases } from '@/hooks/useCases';
 import { useParticipants } from '@/hooks/useParticipants';
@@ -48,6 +49,10 @@ const caseSchema = z.object({
 const CaseForm = () => {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [claimInput, setClaimInput] = useState('');
+  const [claimsList, setClaimsList] = useState(['DEMANDA CIVIL']);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [selectedPredefinedClaim, setSelectedPredefinedClaim] = useState('');
   
   // Hooks para acceder a datos de la API
   const { createCase } = useCases();
@@ -155,9 +160,8 @@ const CaseForm = () => {
     { value: 'JUZGADO DE GARANTÍA', label: 'Juzgado de Garantía' },
     { value: 'TRIBUNAL ORAL EN LO PENAL', label: 'Tribunal Oral en lo Penal' }
   ];
-
-  // Peticiones comunes para el tribunal
-  const commonClaims = [
+  // Peticiones predefinidas
+  const predefinedClaims = [
     'DEMANDA CIVIL',
     'DEMANDA EJECUTIVA Y MANDAMIENTO DE EJECUCIÓN Y EMBARGO',
     'SEÑALA BIENES PARA EMBARGO Y DEPOSITARIO PROVISIONAL',
@@ -220,18 +224,54 @@ const CaseForm = () => {
         });
       }
       
+      // Agregar las peticiones a los datos antes de enviar
+      const dataWithClaims = {
+        ...data,
+        claims: claimsList
+      };
+      
       // Crear la demanda usando createLawsuit del hook
-      await createCase(data);
+      await createCase(dataWithClaims);
       router.push('/dashboard');
     } catch (error) {
       toast.error(`Error al crear el caso: ${error.message}`);
       setSaving(false);
     }
   };
+  // Función para añadir petición
+  const handleAddClaim = (claim) => {
+    const normalizedClaim = claim.trim().toUpperCase();
+    if (normalizedClaim) {
+      const exists = claimsList.some(c => c.toUpperCase() === normalizedClaim);
+      if (exists) {
+        toast.warning('Esta petición ya ha sido agregada');
+        setClaimInput('');
+        setSelectedPredefinedClaim('');
+        return;
+      }
+      setClaimsList(prev => [...prev, normalizedClaim]);
+      setClaimInput('');
+      setSelectedPredefinedClaim('');
+    }
+  };
 
-  // Función para guardar como borrador
-  const saveDraft = () => {
-    toast.info('Borrador guardado');
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddClaim(claimInput);
+    }
+  };
+
+  const handleDeleteClaim = (claimToDelete) => {
+    setClaimsList(prev => prev.filter(claim => claim !== claimToDelete));
+  };
+
+  const handlePredefinedClaimChange = (e) => {
+    const value = e.target.value;
+    setSelectedPredefinedClaim(value);
+    if (value) {
+      handleAddClaim(value);
+    }
   };
 
   return (
@@ -474,6 +514,80 @@ const CaseForm = () => {
         )}
       </div>
       
+      {/* Peticiones al tribunal */}
+      <div>
+        <label className="block mb-1 text-gray-300">Peticiones</label>
+        <div className="space-y-4">
+          {/* Selector de peticiones predefinidas y botón de agregar */}
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedPredefinedClaim}
+              onChange={handlePredefinedClaimChange}
+              className="input-field flex-1"
+            >
+              <option value="">Seleccione una petición predefinida</option>
+              {predefinedClaims.map((claim) => (
+                <option key={claim} value={claim}>
+                  {claim}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowCustomInput(!showCustomInput)}
+              title="Añadir petición personalizada"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-700 hover:bg-gray-600 text-blue-400 cursor-pointer focus:outline-none transition-colors duration-200 shadow-md"
+            >
+              {showCustomInput ? (
+                <FiX className="w-5 h-5" />
+              ) : (
+                <PlusCircle className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+
+          {/* Input para peticiones personalizadas */}
+          {showCustomInput && (
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={claimInput}
+                onChange={(e) => setClaimInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Escriba una petición personalizada"
+                className="input-field flex-1"
+              />
+              <button
+                type="button"
+                onClick={() => handleAddClaim(claimInput)}
+                className="btn-primary px-4 py-2"
+              >
+                Agregar
+              </button>
+            </div>
+          )}
+
+          {/* Lista de peticiones añadidas */}
+          <div className="flex flex-wrap gap-2">
+            {claimsList.map((claim, index) => (
+              <div
+                key={index}
+                className="group flex items-center bg-[#1e2736] text-gray-200 px-3 py-1.5 rounded-md text-sm border border-gray-600 shadow-sm hover:border-indigo-500 transition-colors duration-200"
+              >
+                <span className="inline-block">{claim}</span>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteClaim(claim)}
+                  className="ml-2 p-1 rounded-full hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors duration-200"
+                >
+                  <FiX size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      
       {/* Descripción del caso */}
       <div>
         <label className="block mb-1 text-gray-300">Descripción del caso</label>
@@ -487,17 +601,8 @@ const CaseForm = () => {
           <p className="mt-1 text-sm text-red-500">{errors.description.message}</p>
         )}
       </div>
-      
-      {/* Botones de acción */}
-      <div className="flex justify-end gap-3 mt-6">
-        <button
-          type="button"
-          onClick={saveDraft}
-          className="btn-secondary flex items-center gap-2"
-        >
-          <FiSave className="w-4 h-4" />
-          Guardar borrador
-        </button>
+        {/* Botón de acción */}
+      <div className="flex justify-end mt-6">
         <button
           type="submit"
           disabled={saving}

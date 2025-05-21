@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { lawsuitResource } from '@/lib/apiClient';
 import { toast } from 'react-toastify';
 import { useState, useCallback } from 'react';
-
+import { ContentType } from '@/generated/api/http-client'; // Añade esta importación
 /**
  * Hook para gestionar demandas legales
  * Proporciona funciones para listar, obtener, crear y eliminar demandas
@@ -30,7 +30,7 @@ export const useLawsuits = () => {
       const response = await lawsuitResource.createLawsuit(data);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['lawsuits'] });
       toast.success('Demanda creada exitosamente');
     },
@@ -46,7 +46,7 @@ export const useLawsuits = () => {
       const response = await lawsuitResource.updateLawsuit(id, data);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['lawsuits'] });
       queryClient.invalidateQueries({ queryKey: ['lawsuit'] });
       toast.success('Demanda actualizada exitosamente');
@@ -56,35 +56,49 @@ export const useLawsuits = () => {
       toast.error(`Error al actualizar la demanda: ${error.message || 'Error desconocido'}`);
     }
   });
-
+  
   // Mutación para eliminar una demanda
-  const deleteLawsuitMutation = useMutation({
-    mutationFn: async (id) => {
-      const response = await lawsuitResource.deleteLawsuit(id);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lawsuits'] });
-      toast.success('Demanda eliminada exitosamente');
-    },
-    onError: (error) => {
-      console.error('Error al eliminar demanda:', error);
-      toast.error(`Error al eliminar la demanda: ${error.message || 'Error desconocido'}`);
+const deleteLawsuitMutation = useMutation({
+  onMutate: async (deletedId) => {
+    await queryClient.cancelQueries(['lawsuits']);
+    const previousLawsuits = queryClient.getQueryData(['lawsuits']);
+    
+    // Optimisticamente actualizar la UI
+    if (previousLawsuits) {
+      queryClient.setQueryData(['lawsuits'], 
+        previousLawsuits.filter(l => l.id !== deletedId)
+      );
     }
-  });  // Mutación para actualizar el estado de una demanda
+    
+    return { previousLawsuits };
+  },
+  onError: (err, variables, context) => {
+    console.error('Error en mutación de eliminación:', err);
+    
+    // Si algo falla, revertir a los datos anteriores
+    if (context?.previousLawsuits) {
+      queryClient.setQueryData(['lawsuits'], context.previousLawsuits);
+    }
+  },
+  onSettled: () => {
+    // Siempre refrescar los datos
+    queryClient.invalidateQueries(['lawsuits']);
+  }
+});
+
+  // Mutación para actualizar el estado de una demanda
   const updateLawsuitStatusMutation = useMutation({
     mutationFn: async ({ id, status }) => {
       const response = await lawsuitResource.updateLawsuit(id, { status });
       return response.data;
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries(['lawsuits']);
-      queryClient.invalidateQueries(['lawsuit', variables.id]);
-      toast.success('Estado actualizado correctamente');
+      queryClient.invalidateQueries(['lawsuit', id]);
+      toast.success('Estado actualizado exitosamente');
     },
     onError: (error) => {
       console.error('Error al actualizar el estado:', error);
-      toast.error(`Error al actualizar el estado: ${error.message || 'Error desconocido'}`);
     }
   });
 
@@ -122,27 +136,32 @@ export const useLawsuits = () => {
     });
   };
 
-    /**
+  /**
    * Función para obtener revisiones de una demanda
    * @param {number} id - Identificador de la demanda
    * @returns {string} - Query result con las revisiones
    */
-    const useLawsuitLastRevisions= (id) => {
-      
-      return useQuery({
-        queryKey: ['lawsuit-last-revisions', id],
-        queryFn: async () => {
-          if (!id) return [];
+  const useLawsuitLastRevisions = (id) => {
+    return useQuery({
+      queryKey: ['lawsuit-last-revisions', id],
+      queryFn: async () => {
+        if (!id) return null;
+        try {
           const response = await lawsuitResource.getRevisions(id);
           const innerResponse = response.data;
-          if (innerResponse.length === 0) return null;
+          if (!innerResponse || innerResponse.length === 0) return null;
           const lastRevision = innerResponse.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
           const responseRevision = await lawsuitResource.getRevisionResponse(id, lastRevision.uuid);
-          return await responseRevision.text()
-        },
-        enabled: !!id
-      });
-    };
+          return await responseRevision.text();
+        } catch (error) {
+          console.error('Error fetching last revisions:', error);
+          return null;
+        }
+      },
+      enabled: !!id && id !== 'undefined',
+      retry: false
+    });
+  };
 
   /**
    * Función para obtener una revisión específica
