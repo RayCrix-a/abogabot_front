@@ -83,21 +83,6 @@ export const useCases = () => {
     }
   });
 
-  // Mutación para actualizar el estado de un caso
-  const updateCaseStatusMutation = useMutation({
-    mutationFn: async ({ id, status }) => {
-      const response = await lawsuitResource.updateLawsuitStatus(id, status);
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['cases'] });
-      queryClient.invalidateQueries({ queryKey: ['case'] });
-      toast.success('Estado del caso actualizado');
-    },
-    onError: (error) => {
-      toast.error(`Error al actualizar el estado: ${error.message}`);
-    }
-  });
   /**
    * Función para obtener un caso por ID
    * @param {string} id - Identificador del caso
@@ -120,11 +105,8 @@ export const useCases = () => {
     refetchCases,
     useCase,
     createCase: createCaseMutation.mutateAsync,
-    isCreatingCase: createCaseMutation.isLoading,
-    updateCase: (id, data) => updateCaseMutation.mutate({ id, data }),
+    isCreatingCase: createCaseMutation.isLoading,    updateCase: (id, data) => updateCaseMutation.mutate({ id, data }),
     isUpdatingCase: updateCaseMutation.isLoading,
-    updateCaseStatus: (id, status) => updateCaseStatusMutation.mutate({ id, status }),
-    isUpdatingStatus: updateCaseStatusMutation.isLoading,
     deleteCase: deleteCaseMutation.mutate,
     isDeletingCase: deleteCaseMutation.isLoading
   };

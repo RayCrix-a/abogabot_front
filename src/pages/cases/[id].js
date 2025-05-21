@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import MainLayout from '@/components/layout/MainLayout';
 import CaseDetails from '@/components/cases/CaseDetails';
 import DocumentViewer from '@/components/document/DocumentViewer';
@@ -11,6 +12,7 @@ import { toast } from 'react-toastify';
 
 export default function CaseDetail() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { id } = router.query;
   const [activeTab, setActiveTab] = useState('document'); // 'document' o 'chat'
   const [markdownContent, setMarkdownContent] = useState('');
@@ -21,6 +23,7 @@ export default function CaseDetail() {
     useLawsuit, 
     deleteLawsuit, 
     updateLawsuit,
+    updateLawsuitStatus,
     useLawsuitLastRevisions,
     generate,
     loading: isLoadingGeneration
@@ -31,35 +34,48 @@ export default function CaseDetail() {
   const { data: revision, isLoading: isLoadingRevision, error: revisiontError } = useLawsuitLastRevisions(id);
 
   useEffect(() => {
-    // Si el documento tiene contenido, establecerlo
+    // Si el documento tiene contenido, establecerlo    
     if (revision) {
       setMarkdownContent(revision);
     }
-  }, [revision]);
-
-  // Manejar eliminación de caso
-  const handleDeleteCase = async () => {
-    try {
-      await deleteLawsuit(id);
-      router.push('/dashboard');
-    } catch (error) {
-      console.error('Error al eliminar caso:', error);
-      toast.error(`Error al eliminar el caso: ${error.message || 'Error desconocido'}`);
-    }
-  };
-
+  }, [revision]);  
+  // Manejar eliminación de caso  
+const handleDeleteCase = async () => {
+  if (!id) return false;
+  
+  try {
+    console.log(`Intentando eliminar caso con ID: ${id}`);
+    await deleteLawsuit(id);
+    toast.success('Demanda eliminada exitosamente');
+    router.push('/dashboard');
+    return true;
+  } catch (error) {
+    console.error('Error al eliminar demanda:', error);
+    // Error más específico en el toast para depuración
+    toast.error(`Error al eliminar la demanda: ${error.message || 'Error desconocido'}`);
+    return false;
+  }
+};
   // Manejar cambio de estado del caso
   const handleStatusChange = async (newStatus) => {
     try {
-      if (!lawsuit) return;
+      if (!id || !lawsuit) return;
       
-      // En una implementación real, enviaríamos el estado al servidor
-      // Por ahora solo mostramos una notificación
-      toast.info(`Estado cambiado a: ${newStatus}`);
+      // Creamos un objeto que cumple con la interfaz LawsuitRequest
+      const updateData = {
+        proceedingType: lawsuit.proceedingType.name,
+        subjectMatter: lawsuit.subjectMatter,
+        status: newStatus,
+        plaintiffs: lawsuit.plaintiffs.map(p => p.idNumber),
+        defendants: lawsuit.defendants.map(d => d.idNumber),
+        attorneyOfRecord: lawsuit.attorneyOfRecord?.idNumber,
+        representative: lawsuit.representative?.idNumber,
+        claims: lawsuit.claims,
+        institution: lawsuit.institution,
+        narrative: lawsuit.narrative
+      };
       
-      if (newStatus === 'Finalizado') {
-        toast.info('El caso ha sido finalizado y movido al historial');
-      }
+      await updateLawsuit(id, updateData);
     } catch (error) {
       console.error('Error al cambiar el estado:', error);
       toast.error(`Error al cambiar el estado: ${error.message || 'Error desconocido'}`);
