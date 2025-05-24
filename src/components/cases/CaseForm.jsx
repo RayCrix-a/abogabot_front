@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { toast } from 'react-toastify';
 import { FiFileText, FiX } from 'react-icons/fi';
 import { Plus, X as XIcon, Edit, Trash2, Save, User, PlusCircle } from 'lucide-react';
-import { useCases } from '@/hooks/useCases';
+import { useLawsuits } from '@/hooks/useLawsuits'; // Cambio aquí
 import { useParticipants } from '@/hooks/useParticipants';
 import { useProceedingTypes } from '@/hooks/useProceedingTypes';
 
@@ -33,7 +33,8 @@ const caseSchema = z.object({
 
 const CaseForm = () => {
   const router = useRouter();
-  const [saving, setSaving] = useState(false);  const [claimInput, setClaimInput] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [claimInput, setClaimInput] = useState('');
   const [claimsList, setClaimsList] = useState([]);
   const [showCustomInput, setShowCustomInput] = useState(false);
   
@@ -41,7 +42,8 @@ const CaseForm = () => {
   const [overlayAbierto, setOverlayAbierto] = useState(false);
   const [tipoOverlay, setTipoOverlay] = useState('');
   const [editandoIndice, setEditandoIndice] = useState(-1);
-    // Estados para selecciones múltiples
+  
+  // Estados para selecciones múltiples
   // Ahora almacenamos objetos {id, rut} en lugar de solo RUTs
   const [personasSeleccionadas, setPersonasSeleccionadas] = useState({
     demandantes: [],
@@ -49,7 +51,8 @@ const CaseForm = () => {
     abogados: [],
     representantes: []
   });
-    // Estado para el formulario del overlay
+  
+  // Estado para el formulario del overlay
   const [formData, setFormData] = useState({
     id: null,  // Agregamos el campo id para guardar el ID numérico
     rut: '',
@@ -62,8 +65,9 @@ const CaseForm = () => {
     nombre: '',
     direccion: ''
   });
-    // Hooks para acceder a datos de la API
-  const { createCase } = useCases();
+  
+  // Hooks para acceder a datos de la API
+  const { createLawsuit, isCreatingLawsuit } = useLawsuits(); // Cambio aquí
   const { 
     plaintiffs, defendants, lawyers, representatives,
     createPlaintiff, createDefendant, createLawyer, createRepresentative,
@@ -88,6 +92,7 @@ const CaseForm = () => {
     }
   });
 
+  // ... (mantener todas las funciones de validación y manejo sin cambios)
   // Funciones de validación
   const validarRUT = (rut) => {
     const rutLimpio = rut.replace(/[^0-9kK]/g, '');
@@ -200,7 +205,9 @@ const CaseForm = () => {
       case 'representantes': return representatives || [];
       default: return [];
     }
-  };  const agregarPersonaSeleccionada = (tipo, rutPersona) => {
+  };
+
+  const agregarPersonaSeleccionada = (tipo, rutPersona) => {
     // Verificar que no esté ya seleccionada
     const yaSeleccionada = personasSeleccionadas[tipo].some(p => p.rut === rutPersona);
     
@@ -270,6 +277,7 @@ const CaseForm = () => {
         break;
     }
   };
+
   const obtenerPersonaPorRut = (tipo, rutOPersona) => {
     const datos = obtenerDatosPorTipo(tipo);
     // Si recibimos un objeto {id, rut}, extraemos el rut
@@ -284,6 +292,7 @@ const CaseForm = () => {
     setEditandoIndice(-1);
     setFormData({ rut: '', nombre: '', direccion: '' });
   };
+
   const cerrarOverlay = () => {
     setOverlayAbierto(false);
     setTipoOverlay('');
@@ -299,7 +308,8 @@ const CaseForm = () => {
       'abogados': 'Gestionar Abogados Patrocinantes',
       'representantes': 'Gestionar Representantes Legales'
     };
-    return titulos[tipoOverlay] || '';  };
+    return titulos[tipoOverlay] || '';
+  };
 
   const agregarPersona = async () => {
     const errorRut = validarRUT(formData.rut);
@@ -327,7 +337,8 @@ const CaseForm = () => {
           fullName: formData.nombre,
           address: formData.direccion
         };
-          switch(tipoOverlay) {
+        
+        switch(tipoOverlay) {
           case 'demandantes':
             await createPlaintiff(newParticipant);
             break;
@@ -341,6 +352,7 @@ const CaseForm = () => {
             await createRepresentative(newParticipant);
             break;
         }        
+        
         setFormData({ id: null, rut: '', nombre: '', direccion: '' });
         setErroresValidacion({ rut: '', nombre: '', direccion: '' });
       } catch (error) {
@@ -348,6 +360,7 @@ const CaseForm = () => {
       }
     }
   };
+
   const editarPersona = (indice) => {
     const datosActuales = obtenerDatosPorTipo(tipoOverlay);
     const persona = datosActuales[indice];
@@ -361,7 +374,9 @@ const CaseForm = () => {
       setEditandoIndice(indice);
       setErroresValidacion({ rut: '', nombre: '', direccion: '' });
     }
-  };const guardarEdicion = async () => {
+  };
+
+  const guardarEdicion = async () => {
     const errorRut = validarRUT(formData.rut);
     const errorNombre = validarNombre(formData.nombre);
     const errorDireccion = validarDireccion(formData.direccion);
@@ -373,7 +388,8 @@ const CaseForm = () => {
     });
     
     if (!errorRut && !errorNombre && !errorDireccion && formularioEsValido()) {
-      try {        const datosActualizados = {
+      try {
+        const datosActualizados = {
           id: formData.id,        // Incluimos el ID numérico 
           idNumber: formData.rut,
           fullName: formData.nombre,
@@ -383,7 +399,8 @@ const CaseForm = () => {
         const id = formData.id; // Usamos el ID numérico para la API
         
         console.log(`Guardando edición de ${tipoOverlay}`, { id, data: datosActualizados });
-          switch(tipoOverlay) {
+        
+        switch(tipoOverlay) {
           case 'demandantes':
             await updatePlaintiff({ 
               id, 
@@ -409,7 +426,8 @@ const CaseForm = () => {
             });
             break;
         }
-          // Limpiar el formulario y cerrar modo edición
+        
+        // Limpiar el formulario y cerrar modo edición
         setEditandoIndice(-1);
         setFormData({ id: null, rut: '', nombre: '', direccion: '' });
         setErroresValidacion({ rut: '', nombre: '', direccion: '' });
@@ -418,7 +436,9 @@ const CaseForm = () => {
         toast.error(`Error al actualizar ${tipoOverlay}: ${error.message || 'Error desconocido'}`);
       }
     }
-  };  const eliminarPersona = async (indice) => {
+  };
+
+  const eliminarPersona = async (indice) => {
     try {
       const datosActuales = obtenerDatosPorTipo(tipoOverlay);
       const persona = datosActuales[indice];
@@ -427,13 +447,15 @@ const CaseForm = () => {
         toast.error('No se pudo encontrar la persona a eliminar');
         return;
       }
-        // Usar el ID numérico de la API
+      
+      // Usar el ID numérico de la API
       const id = persona.id;
       const rutCompleto = persona.idNumber;
       
       console.log(`Eliminando ${tipoOverlay} con id numérico:`, id);
       console.log(`RUT de la persona:`, rutCompleto);
-        // Verificamos si la persona está seleccionada en algún grupo
+      
+      // Verificamos si la persona está seleccionada en algún grupo
       const estaSeleccionada = Object.keys(personasSeleccionadas).some(
         (tipo) => personasSeleccionadas[tipo].some(p => p.rut === rutCompleto)
       );
@@ -446,13 +468,16 @@ const CaseForm = () => {
         if (!confirmacion) {
           return;
         }
-          // Remover de las selecciones
+        
+        // Remover de las selecciones
         Object.keys(personasSeleccionadas).forEach((tipo) => {
           if (personasSeleccionadas[tipo].some(p => p.rut === rutCompleto)) {
             eliminarPersonaSeleccionada(tipo, rutCompleto);
           }
         });
-      }      // Eliminar de la base de datos usando el ID numérico
+      }
+
+      // Eliminar de la base de datos usando el ID numérico
       switch(tipoOverlay) {
         case 'demandantes':
           await deletePlaintiff(id);
@@ -471,31 +496,39 @@ const CaseForm = () => {
       console.error(`Error al eliminar ${tipoOverlay}:`, error);
       toast.error(`Error al eliminar ${tipoOverlay}: ${error.message || 'Error desconocido'}`);
     }
-  };  const onSubmit = async (data) => {
+  };
+
+  // Función principal para enviar el caso - ACTUALIZADA
+  const onSubmit = async (data) => {
     setSaving(true);
     toast.info('Procesando solicitud...');
     
     try {
-      const dataWithClaims = {
-        ...data,
+      // Transformar datos al formato esperado por la API según useLawsuits
+      const lawsuitRequest = {
+        proceedingType: data.proceedingType,
+        subjectMatter: data.legalMatter,
+        plaintiffs: personasSeleccionadas.demandantes.map(p => p.id),
+        defendants: personasSeleccionadas.demandados.map(p => p.id),
+        attorneyOfRecord: personasSeleccionadas.abogados.length > 0 ? personasSeleccionadas.abogados[0].id : undefined,
+        representative: personasSeleccionadas.representantes.length > 0 ? personasSeleccionadas.representantes[0].id : undefined,
         claims: claimsList,
-        // Usar los IDs numéricos directamente
-        plaintiffIds: personasSeleccionadas.demandantes.map(p => p.id),
-        defendantIds: personasSeleccionadas.demandados.map(p => p.id),
-        attorneyIds: personasSeleccionadas.abogados.map(p => p.id),
-        representativeIds: personasSeleccionadas.representantes.map(p => p.id)
+        institution: data.institution,
+        narrative: data.description
       };
       
-      console.log('Enviando caso a la API:', dataWithClaims);
-      await createCase(dataWithClaims);
-      toast.success('Caso creado exitosamente');
+      console.log('Enviando caso a la API:', lawsuitRequest);
+      await createLawsuit(lawsuitRequest);
+      // El toast de éxito se maneja en el hook useLawsuits
       router.push('/dashboard');
     } catch (error) {
-      toast.error(`Error al crear el caso: ${error.message}`);
+      // El toast de error se maneja en el hook useLawsuits
+      console.error('Error en onSubmit:', error);
       setSaving(false);
     }
   };
 
+  // ... (mantener todo el resto del componente sin cambios hasta la función onSubmit)
   // Opciones para los selectores
   const legalMatters = [
     { value: 'Cobro de deuda', label: 'Cobro de deuda' },
@@ -524,6 +557,7 @@ const CaseForm = () => {
     'PATROCINIO Y PODER',
     'FORMA DE NOTIFICACIÓN ELECTRÓNICA'
   ];
+
   // Funciones para peticiones
   const handleAddClaim = (claim) => {
     const normalizedClaim = claim.trim().toUpperCase();
@@ -538,6 +572,7 @@ const CaseForm = () => {
       setClaimInput('');
     }
   };
+
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -557,7 +592,9 @@ const CaseForm = () => {
     const [showingRecommendations, setShowingRecommendations] = useState(false);
     const searchRef = useRef(null);
     const personas = obtenerDatosPorTipo(tipo);
-    const seleccionadas = personasSeleccionadas[tipo] || [];    // Obtener los últimos 5 registros creados (ordenados por fecha de creación descendente)
+    const seleccionadas = personasSeleccionadas[tipo] || [];
+
+    // Obtener los últimos 5 registros creados (ordenados por fecha de creación descendente)
     const getRecentlyCreated = () => {
       // Asumimos que las personas más recientes están al final del array
       // Si el API devuelve por fecha de creación en otro orden, habría que ajustar esto
@@ -568,7 +605,9 @@ const CaseForm = () => {
         })
         .slice(-5) // Últimos 5 elementos
         .reverse(); // Para que los más recientes aparezcan primero
-    };// Filtrar personas basado en el término de búsqueda
+    };
+
+    // Filtrar personas basado en el término de búsqueda
     useEffect(() => {
       if (searchTerm.trim() === '') {
         if (showResults) {
@@ -798,12 +837,16 @@ const CaseForm = () => {
           >
             <Plus size={16} className="text-white" />
           </button>
-        </div>        <div className="space-y-3">
+        </div>
+        
+        <div className="space-y-3">
           <AutocompleteSearch 
             tipo={tipo} 
             placeholder={`Buscar por RUT o nombre...`}
             onSelect={(rutPersona) => agregarPersonaSeleccionada(tipo, rutPersona)}
-          />          {seleccionadas.length > 0 ? (
+          />
+          
+          {seleccionadas.length > 0 ? (
             <div className="bg-gray-700/30 border border-gray-600 rounded-md p-3">
               <div className="flex flex-wrap gap-2">
                 {seleccionadas.map((persona) => {
@@ -837,74 +880,6 @@ const CaseForm = () => {
     );
   };
 
-  // Componente para selector múltiple con chips
-  const SelectorMultiple = ({ tipo, titulo, esOpcional = false }) => {
-    const personas = obtenerDatosPorTipo(tipo);
-    const seleccionadas = personasSeleccionadas[tipo] || [];
-
-    return (
-      <div className="mb-8 bg-gray-800/20 border border-gray-600 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-medium flex items-center gap-2 text-white">
-            {titulo} {esOpcional && <span className="text-sm text-gray-400 font-normal">(opcional)</span>}
-            <span className="text-sm text-blue-400">
-              {seleccionadas.length > 0 && `(${seleccionadas.length} seleccionado${seleccionadas.length > 1 ? 's' : ''})`}
-            </span>
-            <button 
-              type="button"
-              onClick={() => abrirOverlay(tipo)}
-              className="bg-blue-500 hover:bg-blue-600 p-1.5 rounded-full transition-colors"
-              title={`Gestionar ${titulo.toLowerCase()}`}
-            >
-              <Plus size={18} className="text-white" />
-            </button>
-          </h3>
-        </div>
-
-        <div className="space-y-4">          <div className="flex gap-2">
-            <AutocompleteSearch 
-              tipo={tipo} 
-              placeholder={`Buscar ${titulo.toLowerCase().slice(0, -1)} por RUT o nombre...`}
-              onSelect={(rutPersona) => agregarPersonaSeleccionada(tipo, rutPersona)}
-            />
-          </div>
-
-          {seleccionadas.length > 0 ? (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-white">Personas seleccionadas:</h4>
-              <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-4 min-h-[80px]">
-                <div className="flex flex-wrap gap-2">                  {seleccionadas.map((personaSeleccionada) => {
-                    const persona = obtenerPersonaPorRut(tipo, personaSeleccionada);
-                    return persona ? (
-                      <div key={personaSeleccionada.rut} className="bg-gray-600/50 border border-gray-500 px-3 py-2 rounded-md flex items-center gap-2 hover:bg-gray-600/70 transition-colors">
-                        <div>
-                          <div className="font-medium text-sm text-white">{persona.fullName}</div>
-                          <div className="text-xs text-gray-300">{persona.idNumber}</div>
-                        </div>
-                        <button 
-                          type="button"
-                          onClick={() => eliminarPersonaSeleccionada(tipo, personaSeleccionada.rut)}
-                          className="text-red-400 hover:text-red-300 ml-2 transition-colors"
-                        >
-                          <XIcon size={16} />
-                        </button>
-                      </div>
-                    ) : null;
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-6 text-center">
-              <div className="text-gray-500 text-sm">
-                No hay {titulo.toLowerCase()} seleccionado{titulo.endsWith('s') ? 's' : ''}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
   return (
     <div className="relative bg-gray-800 min-h-screen p-1">
       <div className="max-w-5xl mx-auto">
@@ -939,7 +914,8 @@ const CaseForm = () => {
               </div>
               
               <div>
-                <label className="block mb-4 text-white font-medium">Materia legal</label>                <select 
+                <label className="block mb-4 text-white font-medium">Materia legal</label>
+                <select 
                   {...register('legalMatter')}
                   className={`w-full bg-[#2D3342] text-white p-3 rounded-md border ${
                     errors.legalMatter ? 'border-red-500' : 'border-gray-500'
@@ -999,7 +975,8 @@ const CaseForm = () => {
 
             {/* Tribunal */}
             <div className="bg-gray-800/20 border border-gray-600 rounded-lg p-6">
-              <label className="block mb-4 text-white font-medium">Tribunal</label>              <select 
+              <label className="block mb-4 text-white font-medium">Tribunal</label>
+              <select 
                 {...register('institution')}
                 className={`w-full bg-[#2D3342] text-white p-3 rounded-md border ${
                   errors.institution ? 'border-red-500' : 'border-gray-500'
@@ -1019,7 +996,8 @@ const CaseForm = () => {
             {/* Peticiones al tribunal */}
             <div className="bg-gray-800/20 border border-gray-600 rounded-lg p-6">
               <label className="block mb-4 text-white font-medium">Peticiones al tribunal</label>
-              <div className="space-y-4">                <div className="flex items-center gap-3">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
                   <PredefinedClaimsAutocomplete onSelect={handleAddClaim} />
                   <button
                     type="button"
@@ -1036,7 +1014,8 @@ const CaseForm = () => {
                 </div>
 
                 {showCustomInput && (
-                  <div className="flex items-center gap-3">                    <input
+                  <div className="flex items-center gap-3">
+                    <input
                       type="text"
                       value={claimInput}
                       onChange={(e) => setClaimInput(e.target.value)}
@@ -1081,7 +1060,8 @@ const CaseForm = () => {
             
             {/* Descripción del caso */}
             <div className="bg-gray-800/20 border border-gray-600 rounded-lg p-6">
-              <label className="block mb-4 text-white font-medium">Descripción del caso</label>              <textarea 
+              <label className="block mb-4 text-white font-medium">Descripción del caso</label>
+              <textarea 
                 {...register('description')}
                 placeholder="Ingrese de forma detallada la descripción del caso"
                 rows={5}
@@ -1098,11 +1078,11 @@ const CaseForm = () => {
             <div className="flex justify-end mt-6">
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || isCreatingLawsuit}
                 className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-md flex items-center gap-2 font-medium transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <FiFileText className="w-5 h-5" />
-                {saving ? 'Creando...' : 'Crear caso'}
+                {saving || isCreatingLawsuit ? 'Creando...' : 'Crear caso'}
               </button>
             </div>
           </form>
@@ -1137,7 +1117,8 @@ const CaseForm = () => {
                   {editandoIndice >= 0 ? 'Editar' : 'Agregar'} persona
                 </h3>
                 <div className="space-y-3">
-                  <div>                    <input
+                  <div>
+                    <input
                       type="text"
                       placeholder="RUT (ej: 12345678-9)"
                       value={formData.rut}
@@ -1156,7 +1137,8 @@ const CaseForm = () => {
                     )}
                   </div>
                   
-                  <div>                    <input
+                  <div>
+                    <input
                       type="text"
                       placeholder="Nombre completo"
                       value={formData.nombre}
@@ -1176,7 +1158,8 @@ const CaseForm = () => {
                     <p className="text-gray-400 text-xs mt-1">{formData.nombre.length}/100 caracteres</p>
                   </div>
                   
-                  <div>                    <input
+                  <div>
+                    <input
                       type="text"
                       placeholder="Dirección"
                       value={formData.direccion}

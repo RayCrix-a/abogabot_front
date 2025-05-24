@@ -5,8 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'react-toastify';
 import { FiSave, FiX } from 'react-icons/fi';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useLawsuits } from '@/hooks/useLawsuits';
+import { useQueryClient } from '@tanstack/react-query';
+import { useLawsuits } from '@/hooks/useLawsuits'; // Cambio aquí
 import { useParticipants } from '@/hooks/useParticipants';
 import { useProceedingTypes } from '@/hooks/useProceedingTypes';
 
@@ -15,7 +15,7 @@ const editCaseSchema = z.object({
   proceedingType: z.string().min(1, 'Seleccione un tipo de procedimiento'),
   subjectMatter: z.string().min(1, 'Ingrese una materia legal'),
   plaintiffs: z.array(z.string()).min(1, 'Debe seleccionar al menos un demandante'),
-  attorneyOfRecord: z.string().min(1, 'Seleccione un abogado patrocinante'),
+  attorneyOfRecord: z.string().optional(),
   defendants: z.array(z.string()).min(1, 'Debe seleccionar al menos un demandado'),
   representative: z.string().optional(),
   claims: z.array(z.string()).min(1, 'Ingrese al menos una petición'),
@@ -31,7 +31,7 @@ const EditCaseForm = ({ caseData, onCancel }) => {
   const queryClient = useQueryClient();
   
   // Hooks para acceder a la API
-  const { updateLawsuit } = useLawsuits();
+  const { updateLawsuit } = useLawsuits(); // Cambio aquí
   const {
     plaintiffs,
     lawyers,
@@ -42,7 +42,7 @@ const EditCaseForm = ({ caseData, onCancel }) => {
     isLoadingDefendants,
     isLoadingRepresentatives
   } = useParticipants();
-  const { proceedingTypes, isLoadingProceedingTypes } = useProceedingTypes();
+  const { proceedingTypeOptions, isLoading: isLoadingProceedingTypes } = useProceedingTypes();
   
   // Preparar valores iniciales para el formulario
   const getInitialValues = () => {
@@ -111,7 +111,7 @@ const EditCaseForm = ({ caseData, onCancel }) => {
         proceedingType: data.proceedingType,
         subjectMatter: data.subjectMatter,
         plaintiffs: data.plaintiffs,
-        attorneyOfRecord: data.attorneyOfRecord,
+        attorneyOfRecord: data.attorneyOfRecord || undefined,
         defendants: data.defendants,
         representative: data.representative || undefined,
         claims: data.claims,
@@ -126,11 +126,11 @@ const EditCaseForm = ({ caseData, onCancel }) => {
       queryClient.invalidateQueries(['lawsuits']);
       queryClient.invalidateQueries(['lawsuit', caseData.id]);
       
-      toast.success('Caso actualizado exitosamente');
+      // El toast de éxito se maneja en el hook useLawsuits
       onCancel(); // Cerrar formulario de edición
     } catch (error) {
       console.error('Error al actualizar caso:', error);
-      toast.error('Error al actualizar el caso');
+      // El toast de error se maneja en el hook useLawsuits
       setSaving(false);
     }
   };
@@ -171,9 +171,9 @@ const EditCaseForm = ({ caseData, onCancel }) => {
             className={`input-field ${errors.proceedingType ? 'border-red-500' : ''}`}
           >
             <option value="">Seleccione una opción</option>
-            {proceedingTypes?.map(type => (
-              <option key={type.name} value={type.name}>
-                {type.description}
+            {proceedingTypeOptions?.map(type => (
+              <option key={type.value} value={type.value}>
+                {type.label}
               </option>
             ))}
           </select>
@@ -313,7 +313,8 @@ const EditCaseForm = ({ caseData, onCancel }) => {
         </div>
         
         {/* Lista de peticiones */}
-        <div className={`bg-dark p-3 rounded-md ${errors.claims ? 'border border-red-500' : 'border border-gray-700'}`}>          {claimsList.length > 0 ? (
+        <div className={`bg-dark p-3 rounded-md ${errors.claims ? 'border border-red-500' : 'border border-gray-700'}`}>
+          {claimsList.length > 0 ? (
             <ul className="space-y-2">
               {claimsList.map((claim, index) => (
                 <li key={index} className="flex justify-between items-center p-2 bg-dark-light rounded">
