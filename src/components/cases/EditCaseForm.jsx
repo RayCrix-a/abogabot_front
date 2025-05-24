@@ -103,37 +103,40 @@ const EditCaseForm = ({ caseData, onCancel }) => {
   };
 
   // Manejar el envío del formulario
-  const onSubmit = async (data) => {
-    setSaving(true);
-    try {
-      // Transformar datos al formato esperado por la API
-      const lawsuitRequest = {
-        proceedingType: data.proceedingType,
-        subjectMatter: data.subjectMatter,
-        plaintiffs: data.plaintiffs,
-        attorneyOfRecord: data.attorneyOfRecord || undefined,
-        defendants: data.defendants,
-        representative: data.representative || undefined,
-        claims: data.claims,
-        institution: data.institution,
-        narrative: data.narrative
-      };
-      
-      // Actualizar la demanda
-      await updateLawsuit(caseData.id, lawsuitRequest);
-      
-      // Invalidar consultas para refrescar datos
-      queryClient.invalidateQueries(['lawsuits']);
-      queryClient.invalidateQueries(['lawsuit', caseData.id]);
-      
-      // El toast de éxito se maneja en el hook useLawsuits
-      onCancel(); // Cerrar formulario de edición
-    } catch (error) {
-      console.error('Error al actualizar caso:', error);
-      // El toast de error se maneja en el hook useLawsuits
-      setSaving(false);
-    }
-  };
+  // En EditCaseForm.jsx, línea ~105, corregir el onSubmit:
+
+const onSubmit = async (data) => {
+  setSaving(true);
+  try {
+    // Transformar datos al formato esperado por la API
+    const lawsuitRequest = {
+      proceedingType: data.proceedingType,
+      subjectMatter: data.subjectMatter,
+      plaintiffs: data.plaintiffs,
+      attorneyOfRecord: data.attorneyOfRecord || undefined,
+      defendants: data.defendants,
+      representative: data.representative || undefined,
+      claims: data.claims,
+      institution: data.institution,
+      narrative: data.narrative
+    };
+    
+    // Actualizar la demanda
+    await updateLawsuit(caseData.id, lawsuitRequest);
+    
+    // Invalidar consultas para refrescar datos
+    queryClient.invalidateQueries(['lawsuits']);
+    queryClient.invalidateQueries(['lawsuit', caseData.id]);
+    
+    // El toast de éxito se maneja en el hook useLawsuits
+    onCancel(); // Cerrar formulario de edición
+  } catch (error) {
+    console.error('Error al actualizar caso:', error);
+    // El toast de error se maneja en el hook useLawsuits
+  } finally {
+    setSaving(false); // CAMBIO: Mover aquí para que siempre se ejecute
+  }
+};
 
   // Mostrar indicador de carga mientras se obtienen los datos
   const isLoading = isLoadingProceedingTypes || isLoadingPlaintiffs || 
