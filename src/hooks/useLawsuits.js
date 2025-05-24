@@ -25,20 +25,20 @@ export const useLawsuits = () => {
   });
 
   // Mutación para crear una nueva demanda
-  const createLawsuitMutation = useMutation({
-    mutationFn: async (data) => {
-      const response = await lawsuitResource.createLawsuit(data);
-      return response.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['lawsuits'] });
-      toast.success('Demanda creada exitosamente');
-    },
-    onError: (error) => {
-      console.error('Error al crear demanda:', error);
-      toast.error(`Error al crear la demanda: ${error.message || 'Error desconocido'}`);
-    }
-  });
+const createLawsuitMutation = useMutation({
+  mutationFn: async (data) => {
+    const response = await lawsuitResource.createLawsuit(data);
+    return response.data;
+  },
+  onSuccess: (data) => {
+    queryClient.invalidateQueries({ queryKey: ['lawsuits'] });
+    toast.success('Demanda creada exitosamente');
+  },
+  onError: (error) => {
+    console.error('Error al crear demanda:', error);
+    toast.error(`Error al crear la demanda: ${error.message || 'Error desconocido'}`);
+  }
+});
 
   // Mutación para actualizar una demanda
   const updateLawsuitMutation = useMutation({
@@ -278,24 +278,30 @@ export const useLawsuits = () => {
   }, []);
 
   return {
-    lawsuits,
-    isLoadingLawsuits,
-    lawsuitsError,
-    refetchLawsuits,
-    useLawsuit,
-    useLawsuitRevisions,
-    useLawsuitRevision,
-    useLawsuitLastRevisions,
-    createLawsuit: createLawsuitMutation.mutate,
-    isCreatingLawsuit: createLawsuitMutation.isLoading,
-    updateLawsuit: (id, data) => updateLawsuitMutation.mutate({ id, data }),
-    isUpdatingLawsuit: updateLawsuitMutation.isLoading,
-    deleteLawsuit: deleteLawsuitMutation.mutate,
-    isDeletingLawsuit: deleteLawsuitMutation.isLoading,
-    updateLawsuitStatus: (id, status) => updateLawsuitStatusMutation.mutate({ id, status }),
-    isUpdatingStatus: updateLawsuitStatusMutation.isLoading,
-    loading,
-    error,
-    generate
-  };
+  lawsuits,
+  isLoadingLawsuits,
+  lawsuitsError,
+  refetchLawsuits,
+  useLawsuit,
+  useLawsuitRevisions,
+  useLawsuitRevision,
+  useLawsuitLastRevisions,
+  
+  // CAMBIOS: Usar mutateAsync para poder hacer await
+  createLawsuit: createLawsuitMutation.mutateAsync,
+  isCreatingLawsuit: createLawsuitMutation.isPending,
+  
+  updateLawsuit: updateLawsuitMutation.mutateAsync,
+  isUpdatingLawsuit: updateLawsuitMutation.isPending,
+  
+  deleteLawsuit: deleteLawsuitMutation.mutateAsync,
+  isDeletingLawsuit: deleteLawsuitMutation.isPending,
+  
+  updateLawsuitStatus: updateLawsuitStatusMutation.mutateAsync,
+  isUpdatingStatus: updateLawsuitStatusMutation.isPending,
+  
+  loading,
+  error,
+  generate
+};
 };

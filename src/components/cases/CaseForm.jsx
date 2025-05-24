@@ -15,19 +15,14 @@ const caseSchema = z.object({
   proceedingType: z.string().min(1, 'Seleccione un tipo de procedimiento'),
   legalMatter: z.string().min(1, 'Seleccione una materia legal'),
   
-  // Arrays de IDs de participantes
-  plaintiffIds: z.array(z.string()).min(1, 'Debe seleccionar al menos un demandante'),
-  defendantIds: z.array(z.string()).min(1, 'Debe seleccionar al menos un demandado'),
-  attorneyIds: z.array(z.string()).optional(),
-  representativeIds: z.array(z.string()).optional(),
+  // CAMBIO: Aceptar números en lugar de strings
+  plaintiffIds: z.array(z.number()).min(1, 'Debe seleccionar al menos un demandante'),
+  defendantIds: z.array(z.number()).min(1, 'Debe seleccionar al menos un demandado'),
+  attorneyIds: z.array(z.number()).optional(),
+  representativeIds: z.array(z.number()).optional(),
   
-  // Tribunal
   institution: z.string().min(1, 'Tribunal requerido'),
-  
-  // Descripción del caso
   description: z.string().min(20, 'La descripción debe tener al menos 20 caracteres'),
-  
-  // Peticiones al tribunal
   claims: z.array(z.string()).optional()
 });
 
@@ -67,8 +62,8 @@ const CaseForm = () => {
   });
   
   // Hooks para acceder a datos de la API
-  const { createLawsuit, isCreatingLawsuit } = useLawsuits(); // Cambio aquí
-  const { 
+const { createLawsuit, isCreatingLawsuit } = useLawsuits();  
+const { 
     plaintiffs, defendants, lawyers, representatives,
     createPlaintiff, createDefendant, createLawyer, createRepresentative,
     updatePlaintiff, updateDefendant, updateLawyer, updateRepresentative,
@@ -207,41 +202,38 @@ const CaseForm = () => {
     }
   };
 
-  const agregarPersonaSeleccionada = (tipo, rutPersona) => {
-    // Verificar que no esté ya seleccionada
-    const yaSeleccionada = personasSeleccionadas[tipo].some(p => p.rut === rutPersona);
+const agregarPersonaSeleccionada = (tipo, rutPersona) => {
+  const yaSeleccionada = personasSeleccionadas[tipo].some(p => p.rut === rutPersona);
+  
+  if (rutPersona && !yaSeleccionada) {
+    const personas = obtenerDatosPorTipo(tipo);
+    const personaCompleta = personas.find(p => p.idNumber === rutPersona);
     
-    if (rutPersona && !yaSeleccionada) {
-      // Obtener la persona completa para tener acceso a su ID numérico
-      const personas = obtenerDatosPorTipo(tipo);
-      const personaCompleta = personas.find(p => p.idNumber === rutPersona);
-      
-      if (!personaCompleta) {
-        toast.error('No se encontró la información completa de la persona');
-        return;
-      }
-      
-      // Guardar tanto el ID numérico como el RUT
-      const nuevaPersona = { id: personaCompleta.id, rut: rutPersona };
-      
-      setPersonasSeleccionadas(prev => ({
-        ...prev,
-        [tipo]: [...prev[tipo], nuevaPersona]
-      }));
+    if (!personaCompleta) {
+      toast.error('No se encontró la información completa de la persona');
+      return;
+    }
+    
+    const nuevaPersona = { id: personaCompleta.id, rut: rutPersona };
+    
+    setPersonasSeleccionadas(prev => ({
+      ...prev,
+      [tipo]: [...prev[tipo], nuevaPersona]
+    }));
 
       // Actualizar el formulario principal con los IDs numéricos
       switch(tipo) {
         case 'demandantes':
-          setValue('plaintiffIds', [...personasSeleccionadas.demandantes.map(p => p.id), nuevaPersona.id]);
+          setValue('plaintiffIds', [...personasSeleccionadas.demandantes.map(p => Number(p.id)), Number(nuevaPersona.id)]);
           break;
         case 'demandados':
-          setValue('defendantIds', [...personasSeleccionadas.demandados.map(p => p.id), nuevaPersona.id]);
+          setValue('defendantIds', [...personasSeleccionadas.demandados.map(p => Number(p.id)), Number(nuevaPersona.id)]);
           break;
         case 'abogados':
-          setValue('attorneyIds', [...personasSeleccionadas.abogados.map(p => p.id), nuevaPersona.id]);
+          setValue('attorneyIds', [...personasSeleccionadas.abogados.map(p => Number(p.id)), Number(nuevaPersona.id)]);
           break;
         case 'representantes':
-          setValue('representativeIds', [...personasSeleccionadas.representantes.map(p => p.id), nuevaPersona.id]);
+          setValue('representativeIds', [...personasSeleccionadas.representantes.map(p => Number(p.id)), Number(nuevaPersona.id)]);
           break;
       }
     }
@@ -258,22 +250,22 @@ const CaseForm = () => {
       case 'demandantes':
         setValue('plaintiffIds', personasSeleccionadas.demandantes
           .filter(persona => persona.rut !== rutPersona)
-          .map(persona => persona.id));
+          .map(persona => Number(persona.id)));
         break;
       case 'demandados':
         setValue('defendantIds', personasSeleccionadas.demandados
           .filter(persona => persona.rut !== rutPersona)
-          .map(persona => persona.id));
+          .map(persona => Number(persona.id)));
         break;
       case 'abogados':
         setValue('attorneyIds', personasSeleccionadas.abogados
           .filter(persona => persona.rut !== rutPersona)
-          .map(persona => persona.id));
+          .map(persona => Number(persona.id)));
         break;
       case 'representantes':
         setValue('representativeIds', personasSeleccionadas.representantes
           .filter(persona => persona.rut !== rutPersona)
-          .map(persona => persona.id));
+          .map(persona => Number(persona.id)));
         break;
     }
   };
@@ -499,34 +491,81 @@ const CaseForm = () => {
   };
 
   // Función principal para enviar el caso - ACTUALIZADA
-  const onSubmit = async (data) => {
-    setSaving(true);
-    toast.info('Procesando solicitud...');
+// En CaseForm.jsx, línea ~290, corregir esta función:
+
+// En CaseForm.jsx, reemplazar completamente la función onSubmit:
+
+const onSubmit = async (data) => {
+  console.log('🚀 onSubmit ejecutado con data:', data);
+  console.log('🚀 personasSeleccionadas:', personasSeleccionadas);
+  console.log('🚀 claimsList:', claimsList);
+  
+  setSaving(true);
+  toast.info('Procesando solicitud...');
+  
+  try {
+    // Asegurar que tenemos los IDs numéricos actualizados
+    const plaintiffIds = personasSeleccionadas.demandantes.map(p => Number(p.id));
+    const defendantIds = personasSeleccionadas.demandados.map(p => Number(p.id));
+    const attorneyIds = personasSeleccionadas.abogados.map(p => Number(p.id));
+    const representativeIds = personasSeleccionadas.representantes.map(p => Number(p.id));
     
-    try {
-      // Transformar datos al formato esperado por la API según useLawsuits
-      const lawsuitRequest = {
-        proceedingType: data.proceedingType,
-        subjectMatter: data.legalMatter,
-        plaintiffs: personasSeleccionadas.demandantes.map(p => p.id),
-        defendants: personasSeleccionadas.demandados.map(p => p.id),
-        attorneyOfRecord: personasSeleccionadas.abogados.length > 0 ? personasSeleccionadas.abogados[0].id : undefined,
-        representative: personasSeleccionadas.representantes.length > 0 ? personasSeleccionadas.representantes[0].id : undefined,
-        claims: claimsList,
-        institution: data.institution,
-        narrative: data.description
-      };
-      
-      console.log('Enviando caso a la API:', lawsuitRequest);
-      await createLawsuit(lawsuitRequest);
-      // El toast de éxito se maneja en el hook useLawsuits
-      router.push('/dashboard');
-    } catch (error) {
-      // El toast de error se maneja en el hook useLawsuits
-      console.error('Error en onSubmit:', error);
+    // Validar que tenemos al menos un demandante y demandado
+    if (plaintiffIds.length === 0) {
+      toast.error('Debe seleccionar al menos un demandante');
       setSaving(false);
+      return;
     }
-  };
+    
+    if (defendantIds.length === 0) {
+      toast.error('Debe seleccionar al menos un demandado');
+      setSaving(false);
+      return;
+    }
+    
+    // Transformar datos al formato esperado por la API - CAMBIO: arrays para attorney y representative
+    const lawsuitRequest = {
+      proceedingType: data.proceedingType,
+      subjectMatter: data.legalMatter,
+      plaintiffs: plaintiffIds,
+      defendants: defendantIds,
+      // CAMBIO: Enviar como array en lugar de un solo elemento
+      attorneyOfRecord: attorneyIds.length > 0 ? attorneyIds : undefined,
+      representative: representativeIds.length > 0 ? representativeIds : undefined,
+      claims: claimsList,
+      institution: data.institution,
+      narrative: data.description
+    };
+    
+    // LOGS DE DEBUG - AQUÍ VAN LOS LOGS
+    console.log('📤 Datos enviados al backend:', JSON.stringify(lawsuitRequest, null, 2));
+    console.log('📤 Tipos de datos:', {
+      proceedingType: typeof lawsuitRequest.proceedingType,
+      subjectMatter: typeof lawsuitRequest.subjectMatter,
+      plaintiffs: Array.isArray(lawsuitRequest.plaintiffs) && lawsuitRequest.plaintiffs.map(p => typeof p),
+      defendants: Array.isArray(lawsuitRequest.defendants) && lawsuitRequest.defendants.map(d => typeof d),
+      // CAMBIO: Actualizar logs para arrays
+      attorneyOfRecord: Array.isArray(lawsuitRequest.attorneyOfRecord) ? 
+        lawsuitRequest.attorneyOfRecord.map(a => typeof a) : typeof lawsuitRequest.attorneyOfRecord,
+      representative: Array.isArray(lawsuitRequest.representative) ? 
+        lawsuitRequest.representative.map(r => typeof r) : typeof lawsuitRequest.representative,
+      claims: Array.isArray(lawsuitRequest.claims) && lawsuitRequest.claims.map(c => typeof c),
+      institution: typeof lawsuitRequest.institution,
+      narrative: typeof lawsuitRequest.narrative
+    });
+    
+    // Llamada a la API
+    await createLawsuit(lawsuitRequest);
+    toast.success('Caso creado exitosamente');
+    router.push('/dashboard');
+    
+  } catch (error) {
+    console.error('🔥 Error completo:', error);
+    toast.error(`Error al crear el caso: ${error.message || 'Error desconocido'}`);
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ... (mantener todo el resto del componente sin cambios hasta la función onSubmit)
   // Opciones para los selectores
@@ -559,24 +598,33 @@ const CaseForm = () => {
   ];
 
   // Funciones para peticiones
-  const handleAddClaim = (claim) => {
-    const normalizedClaim = claim.trim().toUpperCase();
-    if (normalizedClaim) {
-      const exists = claimsList.some(c => c.toUpperCase() === normalizedClaim);
-      if (exists) {
-        toast.warning('Esta petición ya ha sido agregada');
-        setClaimInput('');
-        return;
-      }
-      setClaimsList(prev => [...prev, normalizedClaim]);
+const handleAddClaim = (claim) => {
+  // CAMBIO: Verificar que claim existe y es string antes de usar trim
+  if (!claim || typeof claim !== 'string') {
+    console.log('handleAddClaim recibió:', claim);
+    return;
+  }
+  
+  const normalizedClaim = claim.trim().toUpperCase();
+  if (normalizedClaim) {
+    const exists = claimsList.some(c => c.toUpperCase() === normalizedClaim);
+    if (exists) {
+      toast.warning('Esta petición ya ha sido agregada');
       setClaimInput('');
+      return;
     }
-  };
+    setClaimsList(prev => [...prev, normalizedClaim]);
+    setClaimInput('');
+  }
+};
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleAddClaim(claimInput);
+      // CAMBIO: Asegurar que claimInput existe
+      if (claimInput && claimInput.trim()) {
+        handleAddClaim(claimInput);
+      }
     }
   };
 
@@ -1025,7 +1073,12 @@ const CaseForm = () => {
                     />
                     <button
                       type="button"
-                      onClick={() => handleAddClaim(claimInput)}
+                      onClick={() => {
+                        // CAMBIO: Verificar que claimInput existe antes de llamar handleAddClaim
+                        if (claimInput && claimInput.trim()) {
+                          handleAddClaim(claimInput);
+                        }
+                      }}
                       className="px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
                     >
                       Agregar
